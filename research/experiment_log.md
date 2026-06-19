@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-19
 **Hypothesis:** EXP-089 showed that action-value supervision is useful, but the decode path still mixed fine/medium/full candidates softly while the router argmax nearly always selected fine windows. If we keep the EXP-089 action-value teacher and replace soft decode mixing with straight-through one-hot routing, the model should reduce the soft/argmax mismatch, make reported variable-window bitrate reflect the actual decoded route, and improve chunk deviation relative to EXP-089 without erasing the bitrate gain over EXP-087.
-**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned overrides (`decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight=0.1`, `variable_window_nonimprove_weight=0.1`, TinyStories `4096/512`, `max_steps=10000`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` straight-through variable-window router (commit: working tree)
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned overrides (`decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight=0.1`, `variable_window_nonimprove_weight=0.1`, TinyStories `4096/512`, `max_steps=10000`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` straight-through variable-window router (commit: `15c7f58783c2bb538fe2291d26252ec6580cf14a`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
 
@@ -22,7 +22,20 @@
 - [x] Cap pilot at `10000` steps to fit the T4 timeout.
 - [x] Implement model, metrics, and tests.
 - [x] Pass Python compile checks for model, runner, and tests.
-- [ ] Launch Modal pilot after local validation.
+- [x] Launch Modal pilot after local validation.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp090_modal_dabe_straight_through_window_router_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-npnr4V62u6CdJ9tddNDCDn` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_110400_exp090_modal_dabe_straight_through_window_router_001.json` |
+| Overrides | EXP-089 lead settings plus `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, and `max_steps=10000` |
+| Early status | Trainer startup completed; observed `[eta] step=300/10000 sps=6.30 eta_min=25.7` before detaching local log stream |
 
 ### Status: [RUNNING]
 
