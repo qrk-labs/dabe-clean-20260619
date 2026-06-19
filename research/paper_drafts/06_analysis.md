@@ -58,3 +58,34 @@ If asked "Would a sliding-window tokenizer have worked?", the answer should be:
 - Section 5 Results: include the table above as an ablation/negative-result summary.
 - Section 6 Analysis: use this as evidence that variable granularity should be applied to repair budget, not to the primary token-window geometry.
 - Limitations/Future Work: mention cost-aware hard routing as a possible future variant, but do not present it as the main path.
+
+## Cost-Aware Lookup Knee
+
+EXP-091 and EXP-092 tested whether bluntly increasing sparse lookup cost can reduce bitrate without destroying reconstruction. The result is a clear local knee rather than a monotonic improvement.
+
+### Replicated Knee
+
+| Slot cost | observed bits/token | active K | token_acc | chunk deviation mean | chunk deviation p90 |
+|-----------|--------------------:|---------:|----------:|---------------------:|--------------------:|
+| `0.0225` | `20.26545` | `8.10659` | `0.89255` | `6.87713` | `11.14981` |
+| `0.025` | `20.06207` | `6.63953` | `0.89274` | `6.86454` | `10.96876` |
+| `0.0275` | `19.84857` | `4.54922` | `0.89002` | `7.03849` | `11.12805` |
+
+`0.025` is the best local tradeoff: it has the best token accuracy, mean chunk deviation, and p90 deviation among the adjacent settings. Lower cost spends more lookup budget without improving quality; higher cost saves bits but begins to over-prune lexical repair.
+
+### Interpretation
+
+The cost term is doing useful work, but it is not the main source of quality. EXP-087's quality anchor remains substantially stronger:
+
+| Setting | observed bits/token | token_acc | chunk deviation mean |
+|---------|--------------------:|----------:|---------------------:|
+| EXP-087 quality anchor, cost `0.02` | `20.37236` | `0.91547` | `5.41007` |
+| EXP-092 cost-aware knee, cost `0.025` | `20.06207` | `0.89274` | `6.86454` |
+
+This suggests that the next architectural improvement should not simply increase slot-cost pressure. It should improve router and lookup accuracy at a fixed or lower active K.
+
+### Paper Placement
+
+- Section 5 Results: include EXP-092 as a small replicated rate-distortion curve.
+- Section 6 Analysis: describe `0.025` as the cost-aware knee and EXP-087 as the quality anchor.
+- Limitations: cost-aware compression currently trades away too much quality relative to EXP-087.
