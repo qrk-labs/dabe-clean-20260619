@@ -1,0 +1,13 @@
+{
+  "launched_at": "2026-06-19T21:10:38+01:00",
+  "command": "modal run -d scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder --config-name dabe_tokenizer_autoencoder_smoke --stages train --periodic-commit-seconds 120 --run-id exp093_modal_dabe_fixed_rate_20bpt_001 --overrides 'dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=1280 dabe_tokenizer.model.decoder_mode=hierarchical_local dabe_tokenizer.model.hierarchical_block_tokens=16 dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false'",
+  "return_code": 0,
+  "timed_out_waiting_for_local_process": false,
+  "local_stream_detached_by_interrupt": true,
+  "app_id": "ap-oNvKTYt6qZwGCQF2DvxdXo",
+  "run_id": "exp093_modal_dabe_fixed_rate_20bpt_001",
+  "git_commit": "034bdcd04b7e3d6ebe6cd1f23d1129306abf16f1",
+  "early_status": "Trainer startup completed; observed [eta] step=5500/12000 sps=14.34 eta_min=7.6 before detaching local log stream.",
+  "log_tail_command": "modal app logs ap-oNvKTYt6qZwGCQF2DvxdXo",
+  "volume_probe": "modal volume ls dabe-experiments /experiments/exp093_modal_dabe_fixed_rate_20bpt_001"
+}

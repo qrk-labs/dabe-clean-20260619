@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-19
 **Hypothesis:** EXP-092 identified a cost-aware sparse-repair operating point at `20.06207` observed bits/token, but the paper needs a directly comparable standard learned-tokenizer baseline at the same bitrate. A `1280`-bit hierarchical-local no-lookup tokenizer (`1280 / 64 = 20.0` bits/token) should test whether DABE's gain comes from adaptive lexical repair rather than simply spending about `20` bits/token on a fixed-rate learned chunk code.
-**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1280`, `hierarchical_block_tokens=16`, no sparse lookup path, TinyStories `4096/512`, `max_steps=12000`, `val_check_interval=300`, `checkpoint_every_n_train_steps=2000`, `batch_size=32`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` (commit: `a9540ef1ccad049482cc0eede7bbebc4120fe1f1`)
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1280`, `hierarchical_block_tokens=16`, no sparse lookup path, TinyStories `4096/512`, `max_steps=12000`, `val_check_interval=300`, `checkpoint_every_n_train_steps=2000`, `batch_size=32`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` (commit: `034bdcd04b7e3d6ebe6cd1f23d1129306abf16f1`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
 
@@ -18,10 +18,58 @@
 ### Decisions
 - [x] Use `hierarchical_local` as the standard fixed-rate learned chunk tokenizer comparator.
 - [x] Keep dataset, batch size, steps, and validation cadence aligned with EXP-092 for attribution.
-- [ ] Launch Modal run and capture launch contract.
-- [ ] Pull lightweight artifacts and update paper results table.
+- [x] Launch Modal run and capture launch contract.
+- [x] Pull lightweight artifacts and update paper results table.
 
-### Status: [PLANNED]
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp093_modal_dabe_fixed_rate_20bpt_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-oNvKTYt6qZwGCQF2DvxdXo` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_211038_exp093_modal_dabe_fixed_rate_20bpt_001.json` |
+| Early status | Reached `[eta] step=5500/12000 sps=14.34 eta_min=7.6` before detaching local log stream |
+
+### Results
+| Metric | EXP-093 Value | EXP-092 `0.025` | Interpretation |
+|--------|---------------|-----------------|----------------|
+| run state | complete; `nan_batches=0`, `stable=true` | complete | pass |
+| decoder mode | `hierarchical_local` | `gist_residual_lookup` | fixed-rate no-lookup vs adaptive repair |
+| effective / observed bits/token | `20.0` | `20.06207` | matched bitrate |
+| token_acc | `0.72045` | `0.89274` | adaptive repair `+0.17229` absolute |
+| token_top5_acc | `0.85671` | N/A | no-lookup context |
+| token_top10_acc | `0.89064` | N/A | no-lookup context |
+| chunk deviation mean | `17.89119` | `6.86454` | adaptive repair much lower distortion |
+| chunk deviation p90 | `24.14597` | `10.96876` | adaptive repair much lower tail distortion |
+| exact_16token_block_avg | `0.05774` | N/A | no-lookup local exact reconstruction remains weak |
+| exact_64token_chunk_acc | `0.0` | N/A | no full-chunk exact reconstruction |
+| bit density | `0.48766` | N/A | non-collapsed fixed-rate code |
+| best checkpoint | `best-step-0012000.ckpt` | `best-step-0012000.ckpt` | comparable training horizon |
+
+### Exact Block Accuracy
+| Block | Exact acc | Token acc |
+|-------|-----------|-----------|
+| block 0 | `0.20799` | `0.77813` |
+| block 1 | `0.01258` | `0.71327` |
+| block 2 | `0.00444` | `0.69495` |
+| block 3 | `0.00592` | `0.69546` |
+
+### Key Observations
+- EXP-093 is the matched fixed-rate comparator the paper needed: `20.0` bits/token with no sparse lookup path.
+- The no-lookup fixed-rate code is stable and non-collapsed (`bit_density=0.48766`), but reconstruction remains far below the adaptive repair model.
+- At essentially matched bitrate, EXP-092's cost-aware DABE point improves token accuracy by `+0.17229` absolute and reduces mean chunk deviation by `11.02665`.
+- The result strongly supports the paper claim that the gain comes from sparse lexical repair and residual routing, not simply from spending about `20` bits/token.
+- The fixed-rate baseline still shows the familiar first-block dominance: block 0 exact accuracy is `0.20799`, while blocks 1-3 are near zero.
+
+### Decisions
+- [x] Use EXP-093 as the standard fixed-rate learned-tokenizer comparator in the main paper table.
+- [x] Treat EXP-092 `0.025` vs EXP-093 as the cleanest matched-bitrate evidence for adaptive sparse repair.
+- [x] Freeze training experiments unless a reviewer-critical analysis gap appears.
+
+### Status: [COMPLETE]
 
 ## EXP-092: Cost-Knee Replication Sweep
 

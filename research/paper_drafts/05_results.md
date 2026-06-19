@@ -26,8 +26,10 @@ These runs support the claim that sparse lexical repair is not merely "more bits
 | EXP-071 | 1024-bit no-lookup hierarchical local code | `16.0` | `0.71836` | `0.05403` | fixed-rate learned chunk tokenizer baseline |
 | EXP-079 | 1200-bit no-lookup hierarchical local code | `18.75` | `0.71855` | `0.05459` | matched-bitrate baseline for EXP-077 |
 | EXP-077 | 1024-bit code + learned sparse lookup K=8 | `18.75` | `0.78384` | `0.08198` | same effective bitrate as EXP-079, better reconstruction |
+| EXP-093 | 1280-bit no-lookup hierarchical local code | `20.0` | `0.72045` | `0.05774` | matched-bitrate baseline for EXP-092 |
+| EXP-092 | gist + residual sparse lookup, cost `0.025` | `20.06207` observed | `0.89274` | N/A | same bitrate scale as EXP-093, much better reconstruction |
 
-The cleanest existing matched-bitrate result is EXP-079 vs EXP-077: at `18.75` effective bits/token, learned sparse lookup improves token accuracy by `+0.06529` absolute over a no-lookup fixed-rate code.
+The cleanest matched-bitrate result is now EXP-093 vs EXP-092: at approximately `20` bits/token, adaptive sparse repair improves token accuracy by `+0.17229` absolute and reduces mean chunk deviation from `17.89119` to `6.86454`.
 
 ## Adaptive Budget Ablations
 
@@ -66,12 +68,13 @@ EXP-092 replicated the local cost-knee around `lookup_slot_cost_weight=0.025`.
 
 This supports using `0.025` as the cost-aware operating point and EXP-087 as the quality anchor.
 
-## Remaining Gap
+## Matched 20bpt Comparator
 
-One final comparator would make the results table cleaner:
+EXP-093 closes the main fixed-rate comparator gap.
 
-| Proposed experiment | Purpose | Expected cost |
-|---------------------|---------|---------------|
-| EXP-093 no-lookup `code_bits=1280` hierarchical-local baseline | fixed-rate learned chunk tokenizer at `20.0` bits/token, directly comparable to EXP-092's `20.06` observed bits/token | one single T4 run |
+| Experiment | Mechanism | bits/token | token_acc | chunk deviation mean | chunk deviation p90 | Conclusion |
+|------------|-----------|-----------:|----------:|---------------------:|--------------------:|------------|
+| EXP-093 | fixed-rate no-lookup hierarchical-local code | `20.0` | `0.72045` | `17.89119` | `24.14597` | stable but much worse |
+| EXP-092 | cost-aware gist-residual sparse lookup | `20.06207` observed | `0.89274` | `6.86454` | `10.96876` | adaptive repair wins |
 
-If EXP-093 remains near EXP-071/079 quality, it strengthens the claim that the improvement comes from adaptive lexical repair rather than total bit budget.
+This comparison is the main paper-friendly evidence that DABE's gains are not explained by total bit budget alone.

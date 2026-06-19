@@ -89,3 +89,14 @@ This suggests that the next architectural improvement should not simply increase
 - Section 5 Results: include EXP-092 as a small replicated rate-distortion curve.
 - Section 6 Analysis: describe `0.025` as the cost-aware knee and EXP-087 as the quality anchor.
 - Limitations: cost-aware compression currently trades away too much quality relative to EXP-087.
+
+## Fixed-Rate Comparator
+
+EXP-093 provides the matched fixed-rate learned tokenizer baseline that the results table needed. It uses the same TinyStories setup and a no-lookup `hierarchical_local` decoder with `1280` code bits per 64-token chunk (`20.0` bits/token).
+
+| Setting | bits/token | token_acc | chunk deviation mean | chunk deviation p90 |
+|---------|-----------:|----------:|---------------------:|--------------------:|
+| EXP-093 fixed-rate no-lookup | `20.0` | `0.72045` | `17.89119` | `24.14597` |
+| EXP-092 cost-aware sparse repair | `20.06207` observed | `0.89274` | `6.86454` | `10.96876` |
+
+This is the cleanest support for the central mechanism claim. The fixed-rate code is healthy rather than collapsed (`bit_density=0.48766`), but increasing no-lookup capacity to the same bitrate scale does not approach the adaptive repair model. The gain therefore comes from *where* the model spends lexical precision, not only from *how many* bits it spends.
