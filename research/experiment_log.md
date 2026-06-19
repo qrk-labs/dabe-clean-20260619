@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-19
 **Hypothesis:** EXP-087 showed that the fixed-window `gist_residual_lookup` architecture is the strongest current rate-distortion anchor, and EXP-088/089/090 showed that variable token windows are not the right compression lever. The next step is to make EXP-087 more cost-aware by holding the improved residual router fixed (`residual_router_loss_weight=0.2`) and testing gentler lookup slot cost pressure (`0.02`, `0.025`, `0.03`) rather than the blunt `0.04` setting that over-pruned active lookup slots. A mild cost increase should reduce observed bits/token while preserving most of EXP-087's reconstruction quality.
-**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.02,0.025,0.03}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: working tree)
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.02,0.025,0.03}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: `e0696a5062f7f78b1959a4ea740b8dfcd4277fee`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 5 (Results), 6 (Analysis)
 
@@ -18,8 +18,22 @@
 ### Decisions
 - [x] Return to EXP-087 fixed 64-token chunk + gist-residual sparse lookup architecture.
 - [x] Treat cost-awareness as gentler learned slot-cost pressure before adding new target-K mechanics.
-- [ ] Launch Modal sweep after recording the hypothesis.
+- [x] Launch Modal sweep after recording the hypothesis.
 - [ ] Pull lightweight artifacts and compare against EXP-087.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp091_modal_dabe_cost_aware_gist_residual_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-T2VMgOnyc8FLd1y7CcYgPo` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `9000s` parent function cap |
+| Launch contract | `experiments/modal_launches/20260619_123643_exp091_modal_dabe_cost_aware_gist_residual_001.json` |
+| Router weights | `0.2` |
+| Slot cost weights | `0.02`, `0.025`, `0.03` |
+| Early status | First child reached `[eta] step=600/12000 sps=8.47 eta_min=22.4` before detaching local log stream |
 
 ### Status: [RUNNING]
 
