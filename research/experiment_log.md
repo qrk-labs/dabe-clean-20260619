@@ -37,7 +37,49 @@
 | Overrides | EXP-089 lead settings plus `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, and `max_steps=10000` |
 | Early status | Trainer startup completed; observed `[eta] step=300/10000 sps=6.30 eta_min=25.7` before detaching local log stream |
 
-### Status: [RUNNING]
+### Results
+Run completed successfully and wrote `stage_result.json`/`pipeline_summary.json`. Lightweight artifacts were pulled to `experiments/modal_downloads/exp090_modal_dabe_straight_through_window_router_001/`; local checkpoint copies were removed after confirming the remote Modal volume still has `last.ckpt` and `best-step-0010000.ckpt`.
+
+| Metric | EXP-090 hard ST windows | EXP-089 soft action-value | EXP-088 quantile windows | EXP-087 best | Delta vs EXP-089 |
+|--------|--------------------------|---------------------------|--------------------------|--------------|------------------|
+| run completion | complete | timeout before summary JSON | timeout before summary JSON | complete | improved |
+| last validation step | `9830` | `9830` | `11242` | `12000` | same |
+| observed effective bits/token | `21.70567` | `18.29175` | `19.46092` | `20.37236` | `+3.41392` |
+| variable-window code bits/chunk | `1024.00000` | `822.16589` | `910.26971` | N/A | `+201.83411` |
+| mean soft lookup K | `16.59831` | `15.84117` | `15.23769` | `12.71961` | `+0.75714` |
+| mean threshold-active K | `17.92968` | `16.42043` | `14.64619` | `9.03257` | `+1.50925` |
+| token_acc | `0.87209` | `0.87508` | `0.85820` | `0.91547` | `-0.00300` |
+| token_top5_acc | `0.97708` | `0.97941` | `0.97430` | `0.98558` | `-0.00234` |
+| token_top10_acc | `0.98368` | `0.98577` | `0.98308` | `0.98989` | `-0.00209` |
+| exact chunk accuracy | `0.00074` | `0.00222` | `0.00074` | `0.02221` | `-0.00148` |
+| chunk deviation mean | `8.18653` | `7.99482` | `9.07550` | `5.41007` | `+0.19171` |
+| chunk deviation p90 | `12.83272` | `12.47994` | `14.07357` | `9.04678` | `+0.35278` |
+| chunk deviation p95 | `14.18875` | `13.86432` | `15.70592` | `10.25307` | `+0.32443` |
+| variable-window acc | `0.84141` | `0.71336` | `0.25000` | N/A | `+0.12805` |
+| predicted fine/medium/full | `1.00000 / 0.00000 / 0.00000` | `0.99944 / 0.00056 / 0.00000` | `1.00000 / 0.00000 / 0.00000` | N/A | harder fine collapse |
+| target fine/medium/full | `0.84141 / 0.13120 / 0.02739` | `0.71318 / 0.23001 / 0.05681` | `0.25000 / 0.25019 / 0.49981` | N/A | teacher shifted further toward fine |
+| hard expected window tokens | `16.00000` | `24.34731` | N/A | N/A | hard all-fine |
+| soft expected window tokens | `17.91449` | N/A | N/A | N/A | new metric |
+| soft entropy | `0.34927` | N/A | N/A | N/A | new metric |
+| variable-window base deviation | `9.93967` | `10.13749` | N/A | N/A | `-0.19782` |
+| variable-window oracle deviation | `5.69319` | `5.64175` | N/A | N/A | `+0.05144` |
+| variable-window chosen deviation | `5.88657` | `6.04534` | N/A | N/A | `-0.15877` |
+| variable-window regret | `0.19338` | `0.40359` | N/A | N/A | `-0.21021` |
+| variable-window non-improve rate | `0.03183` | `0.03294` | N/A | N/A | `-0.00111` |
+
+### Key Observations
+- The 10k-step cap solved the operational problem: EXP-090 completed under the `1800s` Modal timeout and wrote final summaries.
+- Straight-through routing reduced action regret (`0.19338` vs `0.40359`) and made chosen candidate deviation better (`5.88657` vs `6.04534`), so the router/action coupling improved locally.
+- The global reconstruction metric got slightly worse than EXP-089: token accuracy fell to `0.87209` and chunk deviation rose to `8.18653`.
+- The bitrate/compression story worsened sharply. Hard one-hot routing collapsed to all-fine, forcing `1024` variable-window code bits/chunk and `21.70567` observed bits/token, above EXP-087's `20.37236`.
+- This suggests the soft mixture in EXP-089 was functioning as a useful relaxed ensemble/compression proxy, not merely a bug. Hard routing needs an explicit bitrate/action-cost term or a budgeted target; otherwise the action-value teacher naturally prefers fine windows.
+
+### Decisions
+- [x] Treat EXP-090 as a completed negative/mixed result.
+- [x] Keep the implementation available because the hard/soft diagnostic split is useful.
+- [ ] Next run should not use unconstrained hard routing. Try action-value targets with a cost-aware oracle (`variable_window_oracle_cost_lambda > 0`) or a budgeted assignment that only permits fine when deviation improvement clears a threshold.
+
+### Status: [COMPLETE]
 
 ## EXP-089: Action-Value Variable Window Router
 
