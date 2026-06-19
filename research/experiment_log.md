@@ -1,5 +1,28 @@
 # Experiment Log
 
+## EXP-091: Cost-Aware Gist-Residual Lookup Sweep
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-087 showed that the fixed-window `gist_residual_lookup` architecture is the strongest current rate-distortion anchor, and EXP-088/089/090 showed that variable token windows are not the right compression lever. The next step is to make EXP-087 more cost-aware by holding the improved residual router fixed (`residual_router_loss_weight=0.2`) and testing gentler lookup slot cost pressure (`0.02`, `0.025`, `0.03`) rather than the blunt `0.04` setting that over-pruned active lookup slots. A mild cost increase should reduce observed bits/token while preserving most of EXP-087's reconstruction quality.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.02,0.025,0.03}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run all three cost variants sequentially in one T4 Modal app/container.
+- Preserve EXP-087 router quality by keeping `residual_router_loss_weight=0.2`.
+- Find a lower-bitrate operating point than EXP-087 best (`20.37236` observed bits/token) without falling near the over-pruned `0.04` quality regime (`~0.895` token accuracy, `~6.72` mean chunk deviation).
+- Preferred target: observed bits/token below `20.1`, token accuracy above `0.91`, and chunk deviation mean below `5.7`.
+- Log soft K, threshold-active K, lookup keep probability, residual-router metrics, lookup/non-lookup token accuracy, and chunk deviation distribution.
+
+### Decisions
+- [x] Return to EXP-087 fixed 64-token chunk + gist-residual sparse lookup architecture.
+- [x] Treat cost-awareness as gentler learned slot-cost pressure before adding new target-K mechanics.
+- [ ] Launch Modal sweep after recording the hypothesis.
+- [ ] Pull lightweight artifacts and compare against EXP-087.
+
+### Status: [RUNNING]
+
 ## Cross-Experiment Note: Variable Windows As A Negative Result
 
 **Date:** 2026-06-19
