@@ -57,6 +57,7 @@ class DABETokenizerAutoencoderOutput:
     variable_window_logits: torch.Tensor | None = None
     variable_window_target: torch.Tensor | None = None
     variable_window_probs: torch.Tensor | None = None
+    variable_window_soft_probs: torch.Tensor | None = None
     variable_window_bits_per_chunk: torch.Tensor | None = None
     variable_window_action_deviation: torch.Tensor | None = None
     variable_window_base_deviation: torch.Tensor | None = None
@@ -255,6 +256,8 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
         self.variable_window_refine_layers = max(1, int(config.get("variable_window_refine_layers", 1)))
         self.variable_window_target_mode = str(config.get("variable_window_target_mode", "quantile"))
         self.variable_window_oracle_cost_lambda = float(config.get("variable_window_oracle_cost_lambda", 0.0))
+        self.variable_window_mixing_mode = str(config.get("variable_window_mixing_mode", "soft"))
+        self.variable_window_temperature = max(1e-3, float(config.get("variable_window_temperature", 1.0)))
         self.sliding_global_bits = max(1, int(config.get("sliding_global_bits", 96)))
         self.sliding_medium_window = max(1, int(config.get("sliding_medium_window", 32)))
         self.sliding_medium_stride = max(1, int(config.get("sliding_medium_stride", 16)))
@@ -292,6 +295,8 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
             raise ValueError("lexical_lookup_slot_policy must be 'fixed' or 'halting'.")
         if self.variable_window_target_mode not in {"quantile", "action_value"}:
             raise ValueError("variable_window_target_mode must be 'quantile' or 'action_value'.")
+        if self.variable_window_mixing_mode not in {"soft", "straight_through", "hard"}:
+            raise ValueError("variable_window_mixing_mode must be 'soft', 'straight_through', or 'hard'.")
         if self.embed_dim % self.diffusion_heads != 0:
             raise ValueError("embed_dim must be divisible by diffusion_heads.")
         if self.embed_dim % self.code_decoder_heads != 0:
@@ -867,6 +872,20 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
             dtype=dtype,
         )
 
+    def _variable_window_selection_probs(self, logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return decode-routing probabilities and soft probabilities for section-4 router analysis."""
+        soft_probs = torch.softmax(logits / float(self.variable_window_temperature), dim=-1)
+        if self.variable_window_mixing_mode == "soft":
+            return soft_probs, soft_probs
+
+        hard_indices = soft_probs.argmax(dim=-1)
+        hard_probs = F.one_hot(hard_indices, num_classes=self.variable_window_levels).to(dtype=soft_probs.dtype)
+        if self.variable_window_mixing_mode == "hard":
+            return hard_probs, soft_probs
+
+        straight_through_probs = hard_probs + soft_probs - soft_probs.detach()
+        return straight_through_probs, soft_probs
+
     def _refine_nonoverlap_windows(
         self,
         hidden: torch.Tensor,
@@ -1097,7 +1116,7 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
             self.embed_dim,
         ).mean(dim=2)
         variable_window_logits = self.variable_window_router(block_features)
-        variable_window_probs = torch.softmax(variable_window_logits, dim=-1)
+        variable_window_probs, variable_window_soft_probs = self._variable_window_selection_probs(variable_window_logits)
         variable_window_bits_per_chunk = self._variable_window_bits_per_chunk(variable_window_probs)
 
         gist_hidden, candidate_hiddens = self._decode_variable_window_hidden(
@@ -1143,6 +1162,7 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
                 variable_window_logits=variable_window_logits,
                 variable_window_target=variable_window_target,
                 variable_window_probs=variable_window_probs,
+                variable_window_soft_probs=variable_window_soft_probs,
                 variable_window_bits_per_chunk=variable_window_bits_per_chunk,
                 variable_window_action_deviation=variable_window_action_deviation,
                 variable_window_base_deviation=variable_window_base_deviation,
@@ -1225,6 +1245,7 @@ class DABEChunkTokenizerAutoencoder(nn.Module):
             variable_window_logits=variable_window_logits,
             variable_window_target=variable_window_target,
             variable_window_probs=variable_window_probs,
+            variable_window_soft_probs=variable_window_soft_probs,
             variable_window_bits_per_chunk=variable_window_bits_per_chunk,
             variable_window_action_deviation=variable_window_action_deviation,
             variable_window_base_deviation=variable_window_base_deviation,
@@ -1639,6 +1660,8 @@ class DABETokenizerAutoencoderModule(L.LightningModule):
             variable_window_target_medium_fraction = torch.zeros((), device=self.device, dtype=token_acc.dtype)
             variable_window_target_full_fraction = torch.zeros((), device=self.device, dtype=token_acc.dtype)
             variable_window_expected_tokens = torch.zeros((), device=self.device, dtype=token_acc.dtype)
+            variable_window_soft_expected_tokens = torch.zeros((), device=self.device, dtype=token_acc.dtype)
+            variable_window_soft_entropy = torch.zeros((), device=self.device, dtype=token_acc.dtype)
             variable_window_code_bits = torch.tensor(
                 float(self.model.code_bits),
                 device=self.device,
@@ -1686,6 +1709,14 @@ class DABETokenizerAutoencoderModule(L.LightningModule):
                 variable_window_expected_tokens = (
                     output.variable_window_probs * window_tokens.view(1, 1, -1)
                 ).sum(dim=-1).mean()
+                if output.variable_window_soft_probs is not None:
+                    soft_probs = output.variable_window_soft_probs.float()
+                    variable_window_soft_expected_tokens = (
+                        soft_probs * window_tokens.float().view(1, 1, -1)
+                    ).sum(dim=-1).mean()
+                    variable_window_soft_entropy = (
+                        -(soft_probs * soft_probs.clamp_min(1e-8).log()).sum(dim=-1).mean()
+                    )
                 if output.variable_window_bits_per_chunk is not None:
                     variable_window_code_bits = output.variable_window_bits_per_chunk.float().mean()
                 if output.variable_window_target is not None:
@@ -1806,6 +1837,8 @@ class DABETokenizerAutoencoderModule(L.LightningModule):
             self.log(f"{stage}/variable_window_target_medium_fraction", variable_window_target_medium_fraction)
             self.log(f"{stage}/variable_window_target_full_fraction", variable_window_target_full_fraction)
             self.log(f"{stage}/variable_window_expected_tokens", variable_window_expected_tokens)
+            self.log(f"{stage}/variable_window_soft_expected_tokens", variable_window_soft_expected_tokens)
+            self.log(f"{stage}/variable_window_soft_entropy", variable_window_soft_entropy)
             self.log(f"{stage}/variable_window_code_bits_per_chunk", variable_window_code_bits)
             self.log(f"{stage}/variable_window_base_deviation_mean", variable_window_base_deviation_mean)
             self.log(f"{stage}/variable_window_oracle_deviation_mean", variable_window_oracle_deviation_mean)
@@ -2581,6 +2614,16 @@ def run_dabe_tokenizer_autoencoder(
         "val_variable_window_expected_tokens_last": (
             float(trainer.callback_metrics["val/variable_window_expected_tokens"].item())
             if "val/variable_window_expected_tokens" in trainer.callback_metrics
+            else None
+        ),
+        "val_variable_window_soft_expected_tokens_last": (
+            float(trainer.callback_metrics["val/variable_window_soft_expected_tokens"].item())
+            if "val/variable_window_soft_expected_tokens" in trainer.callback_metrics
+            else None
+        ),
+        "val_variable_window_soft_entropy_last": (
+            float(trainer.callback_metrics["val/variable_window_soft_entropy"].item())
+            if "val/variable_window_soft_entropy" in trainer.callback_metrics
             else None
         ),
         "val_variable_window_code_bits_per_chunk_last": (

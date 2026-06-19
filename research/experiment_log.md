@@ -1,5 +1,31 @@
 # Experiment Log
 
+## EXP-090: Hard Straight-Through Variable Window Router
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-089 showed that action-value supervision is useful, but the decode path still mixed fine/medium/full candidates softly while the router argmax nearly always selected fine windows. If we keep the EXP-089 action-value teacher and replace soft decode mixing with straight-through one-hot routing, the model should reduce the soft/argmax mismatch, make reported variable-window bitrate reflect the actual decoded route, and improve chunk deviation relative to EXP-089 without erasing the bitrate gain over EXP-087.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned overrides (`decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight=0.1`, `variable_window_nonimprove_weight=0.1`, TinyStories `4096/512`, `max_steps=10000`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` straight-through variable-window router (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Add a backward-compatible `variable_window_mixing_mode` with `soft`, `straight_through`, and `hard` options.
+- Straight-through mode must decode with one-hot window choices while preserving gradients through soft probabilities.
+- Log soft expected tokens and soft entropy separately from hard route expected tokens.
+- Local compile checks pass before launch.
+- Modal pilot finishes or at least reaches final validation under the 30-minute T4 timeout by using `max_steps=10000`.
+- Improve over EXP-089 on chunk deviation mean (`7.99482`) and/or token accuracy (`0.87508`) while tracking whether observed bitrate stays below EXP-087 (`20.37236`).
+
+### Decisions
+- [x] Keep EXP-089 action-value target and non-improvement penalty.
+- [x] Use straight-through hard window selection instead of soft candidate mixing.
+- [x] Cap pilot at `10000` steps to fit the T4 timeout.
+- [x] Implement model, metrics, and tests.
+- [x] Pass Python compile checks for model, runner, and tests.
+- [ ] Launch Modal pilot after local validation.
+
+### Status: [RUNNING]
+
 ## EXP-089: Action-Value Variable Window Router
 
 **Date:** 2026-06-19
