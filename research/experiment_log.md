@@ -20,7 +20,21 @@
 - [x] Keep the sweep sequential to avoid implementation risk while budget is tight.
 - [ ] Pull lightweight artifacts and compare against EXP-091 and EXP-087.
 
-### Status: [PLANNED]
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp092_modal_dabe_cost_knee_repl_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-qKUcNh9KiLENQDiXD0Pk2G` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `9000s` parent function cap |
+| Launch contract | `experiments/modal_launches/20260619_152844_exp092_modal_dabe_cost_knee_repl_001.json` |
+| Router weights | `0.2` |
+| Slot cost weights | `0.0225`, `0.025`, `0.0275` |
+| Early status | First child reached `[eta] step=300/12000 sps=7.80 eta_min=25.0` before detaching local log stream |
+
+### Status: [RUNNING]
 
 ## EXP-091: Cost-Aware Gist-Residual Lookup Sweep
 
