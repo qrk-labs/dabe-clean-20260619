@@ -18,7 +18,7 @@
 ### Decisions
 - [x] Spend compute on a narrow replication rather than a new architecture detour.
 - [x] Keep the sweep sequential to avoid implementation risk while budget is tight.
-- [ ] Pull lightweight artifacts and compare against EXP-091 and EXP-087.
+- [x] Pull lightweight artifacts and compare against EXP-091 and EXP-087.
 
 ### Launch Details
 | Field | Value |
@@ -34,7 +34,26 @@
 | Slot cost weights | `0.0225`, `0.025`, `0.0275` |
 | Early status | First child reached `[eta] step=300/12000 sps=7.80 eta_min=25.0` before detaching local log stream |
 
-### Status: [RUNNING]
+### Results
+| Slot cost | Status | token_acc | chunk deviation mean | chunk deviation p90 | observed bits/token | active K | keep prob | Best checkpoint |
+|-----------|--------|-----------|----------------------|---------------------|---------------------|----------|-----------|-----------------|
+| `0.0225` | complete | `0.89255` | `6.87713` | `11.14981` | `20.26545` | `8.10659` | `0.38777` | `best-step-0012000.ckpt` |
+| `0.025` | complete | `0.89274` | `6.86454` | `10.96876` | `20.06207` | `6.63953` | `0.36928` | `best-step-0012000.ckpt` |
+| `0.0275` | complete | `0.89002` | `7.03849` | `11.12805` | `19.84857` | `4.54922` | `0.34987` | `best-step-0012000.ckpt` |
+
+### Key Observations
+- The replication supports `lookup_slot_cost_weight=0.025` as the local cost-aware knee: it has the best token accuracy, mean chunk deviation, and p90 chunk deviation among the adjacent settings.
+- Increasing the slot cost to `0.0275` continues to reduce observed bitrate (`19.84857` bits/token) and active K (`4.54922`), but reconstruction quality diminishes.
+- Reducing the slot cost to `0.0225` spends more active lookup slots (`8.10659`) and bitrate (`20.26545`) without improving quality over `0.025`.
+- The `0.025` results exactly match EXP-091's `0.025` final metrics, suggesting the apparent knee is stable under the repeated sweep path.
+- EXP-087 remains the quality anchor (`0.91547` token accuracy, `5.41007` mean chunk deviation), while `0.025` is the cost-aware operating point around `20.06` observed bits/token.
+
+### Decisions
+- [x] Use `lookup_slot_cost_weight=0.025` as the paper's cost-aware knee unless a final fixed-rate baseline changes the framing.
+- [x] Treat `0.0275`/`0.03` as lower-bitrate ablation points rather than preferred settings.
+- [ ] If compute permits, run one no-lookup fixed-rate baseline near `20` bits/token to strengthen the standard-comparator table.
+
+### Status: [COMPLETE]
 
 ## EXP-091: Cost-Aware Gist-Residual Lookup Sweep
 
