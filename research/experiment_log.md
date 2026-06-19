@@ -19,7 +19,7 @@
 - [x] Return to EXP-087 fixed 64-token chunk + gist-residual sparse lookup architecture.
 - [x] Treat cost-awareness as gentler learned slot-cost pressure before adding new target-K mechanics.
 - [x] Launch Modal sweep after recording the hypothesis.
-- [ ] Pull lightweight artifacts and compare against EXP-087.
+- [x] Pull lightweight artifacts and compare against EXP-087.
 
 ### Launch Details
 | Field | Value |
@@ -35,7 +35,25 @@
 | Slot cost weights | `0.02`, `0.025`, `0.03` |
 | Early status | First child reached `[eta] step=600/12000 sps=8.47 eta_min=22.4` before detaching local log stream |
 
-### Status: [RUNNING]
+### Results
+| Slot cost | Status | token_acc | chunk deviation mean | chunk deviation p90 | observed bits/token | active K | keep prob | Best checkpoint |
+|-----------|--------|-----------|----------------------|---------------------|---------------------|----------|-----------|-----------------|
+| `0.02` | complete | `0.88896` | `7.10659` | `11.43123` | `20.45823` | `9.49445` | `0.40529` | `best-step-0012000-v1.ckpt` |
+| `0.025` | complete | `0.89274` | `6.86454` | `10.96876` | `20.06207` | `6.63953` | `0.36928` | `best-step-0012000-v1.ckpt` |
+| `0.03` | complete | `0.89080` | `6.98890` | `11.26306` | `19.85791` | `5.22132` | `0.35072` | `best-step-0012000.ckpt` |
+
+### Key Observations
+- The parent sweep completed and wrote both `stage_result.json` and `pipeline_summary.json` under `experiments/exp091_modal_dabe_cost_aware_gist_residual_001`.
+- Modal/Lightning produced two logger versions per variant (`version_0`, `version_1`) and `-v1` checkpoint siblings, which made the live logs look like six runs; the actual config grid remained three variants (`1` router weight x `3` slot costs).
+- Increasing slot-cost pressure reduced active lookup usage and observed bitrate, with `0.03` reaching the lowest observed bits/token (`19.85791`) and active K (`5.22132`).
+- None of the cost-aware variants preserved EXP-087's best reconstruction quality (`0.91547` token accuracy, `5.41007` mean chunk deviation), so the result is a useful rate-reduction ablation rather than a new quality anchor.
+
+### Decisions
+- [x] Treat `lookup_slot_cost_weight=0.025` and `0.03` as lower-bitrate operating points for the rate-distortion curve.
+- [x] Keep EXP-087 as the reconstruction-quality anchor.
+- [ ] Next architectural step should improve router/lookup accuracy at fixed or lower active K rather than simply increasing slot-cost pressure.
+
+### Status: [COMPLETE]
 
 ## Cross-Experiment Note: Variable Windows As A Negative Result
 
