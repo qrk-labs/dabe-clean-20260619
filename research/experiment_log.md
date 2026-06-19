@@ -1,5 +1,30 @@
 # Experiment Log
 
+## Cross-Experiment Note: Variable Windows As A Negative Result
+
+**Date:** 2026-06-19
+**Experiments:** EXP-088, EXP-089, EXP-090
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Reviewer Question
+Would a sliding-window or variable-token-window tokenizer have worked better than the fixed-window gist-residual lookup model?
+
+### Short Answer
+Not in the tested forms. EXP-088/089/090 should be preserved as an explicit negative-result ablation: adaptive token-window geometry either reduced bitrate at substantial reconstruction cost or collapsed to all-fine routing. The stronger conclusion is that DABE should keep stable fixed chunks and adapt the attention/repair budget over those chunks.
+
+### Evidence Summary
+| Experiment | Mechanism | token_acc | chunk deviation mean | observed bits/token | Conclusion |
+|------------|-----------|-----------|----------------------|---------------------|------------|
+| EXP-087 | fixed chunk + gist-residual sparse lookup | `0.91547` | `5.41007` | `20.37236` | anchor/best |
+| EXP-088 | quantile-supervised variable windows | `0.85820` | `9.07550` | `19.46092` | lower bitrate, quality collapse |
+| EXP-089 | action-value variable windows | `0.87508` | `7.99482` | `18.29175` | best variable-window result, still behind EXP-087 |
+| EXP-090 | straight-through hard variable windows | `0.87209` | `8.18653` | `21.70567` | hard routing collapsed to all-fine |
+
+### Paper Use
+- [x] Preserve the data as a preemptive answer to "why not sliding windows?"
+- [x] Add paper-facing analysis note at `research/paper_drafts/06_analysis.md`.
+- [ ] When drafting results, frame this as "adaptive repair budget beats adaptive token-window geometry" rather than as a failed side quest.
+
 ## EXP-090: Hard Straight-Through Variable Window Router
 
 **Date:** 2026-06-19
