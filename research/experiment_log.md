@@ -1,5 +1,27 @@
 # Experiment Log
 
+## EXP-092: Cost-Knee Replication Sweep
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-091 suggests `lookup_slot_cost_weight=0.025` is a local rate-distortion knee: weaker pressure (`0.02`) spends more lookup slots without improving quality, while stronger pressure (`0.03`) lowers bitrate but starts to over-prune. A narrower sequential replication around the knee (`0.0225`, `0.025`, `0.0275`) should show whether the sweet spot is stable enough to use as the paper's cost-aware operating point.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.0225,0.025,0.0275}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: `fbf7b46a662b91ff9b70816df52192df8ca65256`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run all three cost variants sequentially in one T4 Modal app/container; do not introduce a new parallel runtime implementation.
+- Confirm whether `0.025` remains the best quality/cost knee when compared with adjacent costs.
+- Preferred confirmation: `0.025` has the lowest or near-lowest chunk deviation with observed bits/token near or below `20.1`.
+- Stay within the existing `9000s` parent timeout and roughly `$2` compute budget.
+- Preserve reproducibility with launch contract, commit hash, and final lightweight artifacts.
+
+### Decisions
+- [x] Spend compute on a narrow replication rather than a new architecture detour.
+- [x] Keep the sweep sequential to avoid implementation risk while budget is tight.
+- [ ] Pull lightweight artifacts and compare against EXP-091 and EXP-087.
+
+### Status: [PLANNED]
+
 ## EXP-091: Cost-Aware Gist-Residual Lookup Sweep
 
 **Date:** 2026-06-19
