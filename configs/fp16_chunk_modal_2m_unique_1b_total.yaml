@@ -1,0 +1,16 @@
+defaults:
+  - fp16_chunk_2m_unique_1b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_2m_unique_1b_total"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    precision: "bf16-mixed"
+    num_workers: 8
+
+fp16_chunk_modal:
+  use_memmap: true

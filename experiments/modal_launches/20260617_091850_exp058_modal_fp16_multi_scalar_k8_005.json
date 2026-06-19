@@ -1,0 +1,10 @@
+{
+  "launched_at": "2026-06-17T09:18:50.367655+00:00",
+  "command": "modal run -d scripts/modal_fp16_chunk.py::run_pipeline --config-name fp16_chunk_multi_scalar_k8_modal --stages preprocess,train --periodic-commit-seconds 300 --run-id exp058_modal_fp16_multi_scalar_k8_005",
+  "return_code": -15,
+  "timed_out_waiting_for_local_process": true,
+  "app_id": "ap-BlliHWl8oYbQ7tVyZEjnGq",
+  "log_tail_command": "modal app logs ap-BlliHWl8oYbQ7tVyZEjnGq",
+  "status_command": "modal app list --json",
+  "raw_output": "\u2713 Initialized. View run at \nhttps://modal.com/apps/qrk-labs/main/ap-BlliHWl8oYbQ7tVyZEjnGq\n\u2713 Created objects.\n\u251c\u2500\u2500 \ud83d\udd28 Created mount \n\u2502   /Users/mainasaratsowa/code/qrk/dabe/scripts/modal_fp16_chunk.py\n\u251c\u2500\u2500 \ud83d\udd28 Created mount /Users/mainasaratsowa/code/qrk/dabe/configs\n\u251c\u2500\u2500 \ud83d\udd28 Created mount /Users/mainasaratsowa/code/qrk/dabe/src\n\u251c\u2500\u2500 \ud83d\udd28 Created function run_preprocess_stage.\n\u251c\u2500\u2500 \ud83d\udd28 Created function run_train_stage.\n\u2514\u2500\u2500 \ud83d\udd28 Created function run_pipeline.\nSeed set to 42\nWarning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads."
+}

@@ -1,0 +1,77 @@
+{
+  "status": "ok",
+  "run_id": "exp064_modal_dabe_tokae_tinystories_t4_30m_long_004",
+  "output_dir": "/vol/experiments/exp064_modal_dabe_tokae_tinystories_t4_30m_long_004",
+  "config_name": "dabe_tokenizer_autoencoder_smoke",
+  "overrides": "dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false experiment.device=cuda dabe_tokenizer.training.precision=bf16-mixed dabe_tokenizer.training.num_workers=4 dabe_tokenizer.training.eta_stdout=true dabe_tokenizer.training.eta_log_interval_steps=100",
+  "config": {
+    "experiment": {
+      "name": "dabe_tokenizer_autoencoder_smoke",
+      "seed": 42,
+      "device": "cuda"
+    },
+    "dabe_tokenizer": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 4096,
+        "val_samples": 512,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "codec": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "chunk_stride_tokens": 64,
+        "code_bits": 256,
+        "tokenizer_batch_size": 32
+      },
+      "model": {
+        "embed_dim": 64,
+        "hidden_dim": 256,
+        "dropout": 0.0
+      },
+      "training": {
+        "batch_size": 32,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "bit_balance_weight": 0.01,
+        "max_steps": 12000,
+        "val_check_interval": 300,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 5,
+        "eta_log_interval_steps": 100,
+        "eta_stdout": true,
+        "enable_csv_logger": true,
+        "enable_progress_bar": false,
+        "checkpoint_every_n_train_steps": 2000,
+        "checkpoint_save_top_k": 1,
+        "checkpoint_save_last": true,
+        "precision": "bf16-mixed"
+      }
+    }
+  },
+  "result": {
+    "train": {
+      "stable": true,
+      "nan_batches": 0,
+      "train_chunks": 11269,
+      "val_chunks": 1351,
+      "chunk_size_tokens": 64,
+      "code_bits": 256,
+      "bits_per_token": 4.0,
+      "val_loss_first": 10.815071105957031,
+      "val_loss_last": 4.056744575500488,
+      "val_token_acc_last": 0.3190229535102844,
+      "val_exact_chunk_acc_last": 0.0,
+      "val_token_top5_acc_last": 0.5159719586372375,
+      "val_token_top10_acc_last": 0.5926165580749512,
+      "val_bit_density_last": 0.4903601408004761,
+      "best_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp064_modal_dabe_tokae_tinystories_t4_30m_long_004/checkpoints/best-step-0008000.ckpt"
+    }
+  }
+}

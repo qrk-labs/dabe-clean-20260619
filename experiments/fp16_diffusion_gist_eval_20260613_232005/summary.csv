@@ -1,0 +1,3 @@
+chunk_size,run_dir,stable,nan_batches,val_loss_first,val_loss_last,val_diffusion_loss_last,val_gist_cosine_last,val_gist_retrieval_top1_last,val_trend_pass,steps_per_sec,raw_tokens_per_sec
+64,experiments/fp16_chunk_diffusion_gist_window64_smoke_20260613_232010,True,0,0.3194035291671753,0.3177575469017029,1.2700636386871338,0.0356624461710453,0.0031645570416003466,True,17.111880597274666,560581.9228856434
+8,experiments/fp16_chunk_diffusion_gist_window8_smoke_20260613_232217,True,0,0.32146507501602173,0.3197323977947235,1.2714837789535522,0.012980441562831402,0.001972171477973461,True,11.776003437484645,48234.51007993711

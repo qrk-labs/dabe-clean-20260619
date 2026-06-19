@@ -1,0 +1,4 @@
+run_id,num_prompts,coherent_rate,strict_coherent_rate,unique_continuations,dominant_continuation_share,mojibake_rows,rubric_avg_score,rubric_pass_rate,llm_rubric_avg_score,llm_rubric_pass_rate,llm_judge_requests,llm_judge_fallback_rows,avg_decode_latency_ms,llm_judge_model
+exp031_modal_fp16_2m3b_optfix_001,100,0.900000,0.440000,63,0.070000,49,6.690000,0.500000,2.410000,0.030000,13,0,14.792628,deepseek/deepseek-v4-flash
+exp034_modal_fp16_2m3b_sat_v2_001,100,0.930000,0.070000,33,0.070000,75,6.170000,0.250000,2.070000,0.000000,13,0,14.638019,deepseek/deepseek-v4-flash
+exp036_modal_fp16_2m32b_8gb_v2_001,100,0.960000,0.000000,22,0.140000,100,5.860000,0.000000,1.230000,0.000000,13,0,11.203801,deepseek/deepseek-v4-flash

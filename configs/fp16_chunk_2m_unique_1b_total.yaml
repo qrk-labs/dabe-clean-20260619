@@ -1,0 +1,33 @@
+defaults:
+  - fp16_chunk_best64_frozen
+  - _self_
+
+experiment:
+  name: "fp16_chunk_2m_unique_1b_total"
+  seed: 42
+  device: "auto"
+
+fp16_chunk:
+  dataset:
+    # Empirically ~3 compressed chunks per TinyStories row at chunk_size=64.
+    # 10.5k rows targets ~31.5k chunks => ~2.0M unique raw-token-equivalent.
+    train_samples: 10500
+    val_samples: 2048
+    streaming: true
+    allow_synthetic_fallback: false
+
+  training:
+    # raw_tokens/step = batch_size * compressed_seq_len * chunk_size_tokens
+    # = 64 * 8 * 64 = 32,768. 30,518 steps targets ~1.0B total raw tokens processed.
+    max_steps: 30518
+    val_check_interval: 1000
+    checkpoint_every_n_train_steps: 2000
+    checkpoint_save_top_k: 1
+    checkpoint_save_last: true
+
+  compression:
+    chunk_size_tokens: 64
+
+  diffusion:
+    enabled: true
+    chunk_size_tokens: 64

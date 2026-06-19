@@ -1,0 +1,38 @@
+defaults:
+  - fp16_chunk_feasibility_smoke
+  - _self_
+
+experiment:
+  name: "fp16_chunk_experimental_64"
+  seed: 42
+  device: "auto"
+
+fp16_chunk:
+  dataset:
+    train_samples: 8192
+    val_samples: 1024
+
+  compression:
+    chunk_size_tokens: 64
+
+  model:
+    hidden_dim: 320
+    num_layers: 5
+    num_heads: 5
+    ff_dim: 1280
+    dropout: 0.1
+
+  training:
+    batch_size: 64
+    max_steps: 3000
+    val_check_interval: 100
+    learning_rate: 3e-4
+    weight_decay: 0.01
+
+  diffusion:
+    enabled: true
+    latent_dim: 160
+    timesteps: 256
+    loss_weight: 0.25
+    reconstruction_weight: 0.2
+    chunk_size_tokens: 64

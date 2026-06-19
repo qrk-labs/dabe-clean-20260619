@@ -1,0 +1,84 @@
+{
+  "status": "ok",
+  "run_id": "exp066_modal_dabe_reverse_diffusion_probe_001",
+  "source_run_id": "exp065_modal_dabe_tokae_diffusion_bits_sweep_001",
+  "output_dir": "/vol/experiments/exp066_modal_dabe_reverse_diffusion_probe_001",
+  "config_name": "dabe_tokenizer_autoencoder_smoke",
+  "base_overrides": "dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false experiment.device=cuda dabe_tokenizer.training.precision=bf16-mixed dabe_tokenizer.training.num_workers=4 dabe_tokenizer.model.decoder_mode=diffusion",
+  "code_bits_values": [
+    512,
+    1024
+  ],
+  "max_batches": 64,
+  "sample_steps": 64,
+  "result": {
+    "probe": {
+      "512": {
+        "run_id": "exp066_modal_dabe_reverse_diffusion_probe_001_bits_512",
+        "source_checkpoint": "/vol/experiments/exp065_modal_dabe_tokae_diffusion_bits_sweep_001/bits_512/checkpoints/best-step-0006000.ckpt",
+        "output_dir": "/vol/experiments/exp066_modal_dabe_reverse_diffusion_probe_001/bits_512",
+        "overrides": "dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false experiment.device=cuda dabe_tokenizer.training.precision=bf16-mixed dabe_tokenizer.training.num_workers=4 dabe_tokenizer.model.decoder_mode=diffusion dabe_tokenizer.codec.code_bits=512",
+        "result": {
+          "checkpoint_path": "/vol/experiments/exp065_modal_dabe_tokae_diffusion_bits_sweep_001/bits_512/checkpoints/best-step-0006000.ckpt",
+          "max_batches": 64,
+          "sample_steps": 64,
+          "train_chunks": 11269,
+          "val_chunks": 1351,
+          "chunk_size_tokens": 64,
+          "code_bits": 512,
+          "bits_per_token": 8.0,
+          "decoder_mode": "diffusion",
+          "batches": 43,
+          "bit_density": 0.4369373009648434,
+          "one_step_tmax": {
+            "token_acc": 0.17770401554404144,
+            "token_top5_acc": 0.2580727239082161,
+            "token_top10_acc": 0.3077234455958549,
+            "exact_chunk_acc": 0.0,
+            "embed_mse": 241.81819239799222
+          },
+          "reverse_ddim": {
+            "token_acc": 0.1754718726868986,
+            "token_top5_acc": 0.2250532013323464,
+            "token_top10_acc": 0.24690044411547002,
+            "exact_chunk_acc": 0.0,
+            "embed_mse": 299.9333946064258
+          }
+        }
+      },
+      "1024": {
+        "run_id": "exp066_modal_dabe_reverse_diffusion_probe_001_bits_1024",
+        "source_checkpoint": "/vol/experiments/exp065_modal_dabe_tokae_diffusion_bits_sweep_001/bits_1024/checkpoints/best-step-0006000.ckpt",
+        "output_dir": "/vol/experiments/exp066_modal_dabe_reverse_diffusion_probe_001/bits_1024",
+        "overrides": "dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false experiment.device=cuda dabe_tokenizer.training.precision=bf16-mixed dabe_tokenizer.training.num_workers=4 dabe_tokenizer.model.decoder_mode=diffusion dabe_tokenizer.codec.code_bits=1024",
+        "result": {
+          "checkpoint_path": "/vol/experiments/exp065_modal_dabe_tokae_diffusion_bits_sweep_001/bits_1024/checkpoints/best-step-0006000.ckpt",
+          "max_batches": 64,
+          "sample_steps": 64,
+          "train_chunks": 11269,
+          "val_chunks": 1351,
+          "chunk_size_tokens": 64,
+          "code_bits": 1024,
+          "bits_per_token": 16.0,
+          "decoder_mode": "diffusion",
+          "batches": 43,
+          "bit_density": 0.3513707768085391,
+          "one_step_tmax": {
+            "token_acc": 0.17454663212435234,
+            "token_top5_acc": 0.23998427091043673,
+            "token_top10_acc": 0.26873612139156183,
+            "exact_chunk_acc": 0.0,
+            "embed_mse": 295.2221480905348
+          },
+          "reverse_ddim": {
+            "token_acc": 0.18157846039970393,
+            "token_top5_acc": 0.22173390081421168,
+            "token_top10_acc": 0.2386311065877128,
+            "exact_chunk_acc": 0.0,
+            "embed_mse": 298.2297545799408
+          }
+        }
+      }
+    }
+  }
+}

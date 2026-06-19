@@ -1,0 +1,72 @@
+experiment:
+  name: dabe_tokenizer_autoencoder_smoke
+  seed: 42
+  device: cuda
+dabe_tokenizer:
+  dataset:
+    dataset_name: roneneldan/TinyStories
+    train_split: train
+    val_split: validation
+    train_samples: 4096
+    val_samples: 512
+    text_field: text
+    allow_synthetic_fallback: false
+    streaming: true
+  codec:
+    tokenizer_name: gpt2
+    force_fast_tokenizer: true
+    chunk_size_tokens: 64
+    chunk_stride_tokens: 64
+    code_bits: 1200
+    tokenizer_batch_size: 32
+  model:
+    embed_dim: 64
+    hidden_dim: 256
+    dropout: 0.0
+    decoder_mode: hierarchical_local
+    diffusion_steps: 64
+    diffusion_layers: 2
+    diffusion_heads: 4
+    code_decoder_layers: 2
+    code_decoder_heads: 4
+    hierarchical_block_tokens: 16
+    hierarchical_decoder_layers: 2
+    hierarchical_decoder_heads: 4
+    hierarchical_refine_layers: 1
+    hierarchical_local_refine_layers: 1
+    hierarchical_local_refine_causal: true
+    lexical_lookup_k: 8
+    lexical_lookup_heads: 4
+    lexical_lookup_copy_scale: 4.0
+    lexical_lookup_selector: oracle_loss
+    sliding_global_bits: 96
+    sliding_medium_window: 32
+    sliding_medium_stride: 16
+    sliding_medium_bits: 64
+    sliding_fine_window: 16
+    sliding_fine_stride: 8
+    sliding_fine_bits: 32
+    sliding_decoder_layers: 1
+    sliding_decoder_heads: 4
+    sliding_refine_layers: 1
+  training:
+    batch_size: 32
+    num_workers: 4
+    learning_rate: 0.0003
+    weight_decay: 0.01
+    bit_balance_weight: 0.01
+    diffusion_loss_weight: 0.1
+    selector_loss_weight: 0.1
+    block_loss_weights: []
+    max_steps: 12000
+    val_check_interval: 300
+    grad_clip: 1.0
+    log_every_n_steps: 5
+    eta_log_interval_steps: 100
+    eta_stdout: true
+    enable_csv_logger: true
+    enable_progress_bar: false
+    checkpoint_every_n_train_steps: 2000
+    checkpoint_save_top_k: 1
+    checkpoint_save_last: true
+    precision: bf16-mixed

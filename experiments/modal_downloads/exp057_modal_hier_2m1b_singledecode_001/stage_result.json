@@ -1,0 +1,173 @@
+{
+  "status": "ok",
+  "run_id": "exp057_modal_hier_2m1b_singledecode_001",
+  "output_dir": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001",
+  "config_name": "fp16_hierarchical_64_8_1_modal_t4",
+  "overrides": "fp16_chunk.training.max_steps=30518 fp16_chunk.training.val_check_interval=1000 fp16_chunk.training.checkpoint_every_n_train_steps=2000 fp16_chunk.decode_mirror.enabled=false fp16_chunk.training.precision=16-mixed experiment.device=cuda",
+  "config": {
+    "experiment": {
+      "name": "fp16_hierarchical_64_8_1_modal_t4",
+      "seed": 42,
+      "device": "cuda"
+    },
+    "fp16_chunk": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 10500,
+        "val_samples": 2048,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "compression": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "window_overlap": 0,
+        "dtype": "float16",
+        "tokenizer_batch_size": 64
+      },
+      "model": {
+        "hidden_dim": 256,
+        "num_layers": 4,
+        "num_heads": 4,
+        "ff_dim": 1024,
+        "dropout": 0.1,
+        "attention": {
+          "backend": "auto"
+        }
+      },
+      "training": {
+        "compressed_seq_len": 8,
+        "window_stride": 1,
+        "batch_size": 64,
+        "num_workers": 8,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "max_steps": 30518,
+        "val_check_interval": 1000,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 20,
+        "eta_log_interval_steps": 200,
+        "enable_csv_logger": true,
+        "checkpoint_every_n_train_steps": 2000,
+        "checkpoint_save_top_k": 1,
+        "checkpoint_save_last": true,
+        "precision": "16-mixed",
+        "eta_stdout": true
+      },
+      "diffusion": {
+        "enabled": true,
+        "latent_dim": 128,
+        "timesteps": 256,
+        "loss_weight": 0.25,
+        "reconstruction_weight": 0.2,
+        "vocab_size": 50257,
+        "chunk_size_tokens": 64,
+        "compute_train_gist_metrics": false
+      },
+      "gate": {
+        "require_stable": true,
+        "require_downward_trend": true,
+        "min_relative_drop": 0.0
+      },
+      "hierarchical": {
+        "enabled": true,
+        "coarse_chunk_size": 64,
+        "mid_chunk_size": 8,
+        "fine_chunk_size": 1,
+        "router_temperature": 1.0,
+        "hard_routing": false,
+        "route_balance_weight": 0.02,
+        "route_entropy_weight": 0.0,
+        "route_target": [
+          0.55,
+          0.3,
+          0.15
+        ],
+        "base_residual_weight": 0.15
+      },
+      "decode_mirror": {
+        "enabled": false,
+        "coarse_stride": 8,
+        "mid_stride": 4,
+        "fine_stride": 1,
+        "loss_weight": 0.1,
+        "coarse_weight": 0.2,
+        "mid_weight": 0.3,
+        "fine_weight": 0.5,
+        "scalar_mid_weight": 0.25,
+        "scalar_fine_weight": 0.25,
+        "infer_coarse_weight": 0.2,
+        "infer_mid_weight": 0.3,
+        "infer_fine_weight": 0.5,
+        "next_token_supervision": {
+          "enabled": false,
+          "loss_weight": 0.1,
+          "sample_batch_size": 4,
+          "position_stride": 8,
+          "max_positions": 8
+        },
+        "diversity_regularization": {
+          "enabled": false,
+          "loss_weight": 0.05,
+          "sample_batch_size": 4,
+          "temperature": 1.0,
+          "entropy_target": 6.0,
+          "entropy_weight": 1.0,
+          "top1_max": 0.35,
+          "top1_weight": 1.0,
+          "adjacent_similarity_weight": 0.1
+        }
+      }
+    },
+    "fp16_chunk_modal": {
+      "use_memmap": true
+    }
+  },
+  "result": {
+    "train": {
+      "stable": true,
+      "nan_batches": 0,
+      "val_loss_first": 0.04687602072954178,
+      "val_loss_last": 0.008412636816501617,
+      "val_trend_pass": true,
+      "diffusion_enabled": true,
+      "val_diffusion_loss_last": 0.032594263553619385,
+      "val_gist_cosine_last": 0.9995715022087097,
+      "val_gist_retrieval_top1_last": 0.0020524233113974333,
+      "val_next_token_ce_last": null,
+      "val_next_token_acc_last": null,
+      "val_route_usage_coarse_last": 0.5765401124954224,
+      "val_route_usage_mid_last": 0.28386640548706055,
+      "val_route_usage_fine_last": 0.1395934373140335,
+      "first_batch_seconds": 1.2278838649999955,
+      "steps_per_sec": 23.73977129666,
+      "compressed_tokens_per_sec": 12153.53071967949,
+      "raw_tokens_per_sec": 777825.9660594873,
+      "gpu_mem_peak_mb": 221.421875,
+      "cpu_util_avg": 0.0,
+      "gpu_util_avg": null,
+      "device": "cuda:0",
+      "train_samples": 29373,
+      "val_samples": 5055,
+      "train_chunks": 29381,
+      "val_chunks": 5063,
+      "coarse_chunk_size": 64,
+      "mid_chunk_size": 8,
+      "fine_chunk_size": 1,
+      "gate_pass": true,
+      "metrics_csv_path": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/logs/version_0/metrics.csv",
+      "checkpoint_dir": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/checkpoints",
+      "train_scalars_coarse_path": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/train_scalars_coarse.npy",
+      "train_scalars_mid_path": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/train_scalars_mid.npy",
+      "train_scalars_fine_path": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/train_scalars_fine.npy",
+      "train_chunk_tokens_path": "/vol/experiments/exp057_modal_hier_2m1b_singledecode_001/train_chunk_tokens.npy",
+      "best_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp057_modal_hier_2m1b_singledecode_001/checkpoints/best-step-0030000.ckpt",
+      "last_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp057_modal_hier_2m1b_singledecode_001/checkpoints/last.ckpt",
+      "last_periodic_checkpoint_path": null
+    }
+  }
+}

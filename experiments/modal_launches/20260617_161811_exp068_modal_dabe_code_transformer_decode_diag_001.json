@@ -1,0 +1,10 @@
+{
+  "launched_at": "2026-06-17T16:18:11.766192+00:00",
+  "command": "modal run -d scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics --config-name dabe_tokenizer_autoencoder_smoke --stages probe --periodic-commit-seconds 120 --run-id exp068_modal_dabe_code_transformer_decode_diag_001 --overrides 'dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false'",
+  "return_code": 1,
+  "timed_out_waiting_for_local_process": false,
+  "app_id": null,
+  "log_tail_command": null,
+  "status_command": "modal app list --json",
+  "raw_output": "\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 Could not connect to the Modal server.                                       \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f"
+}

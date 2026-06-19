@@ -1,0 +1,12 @@
+defaults:
+  - fp16_chunk_feasibility_smoke
+  - _self_
+
+experiment:
+  name: "fp16_chunk_multi_scalar_k8_smoke"
+  seed: 42
+  device: "auto"
+
+fp16_chunk:
+  compression:
+    scalars_per_chunk: 8

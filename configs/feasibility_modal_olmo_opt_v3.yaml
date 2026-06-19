@@ -1,0 +1,31 @@
+defaults:
+  - feasibility_modal_olmo_scale_v1
+  - _self_
+
+experiment:
+  name: "feasibility_modal_olmo_opt_v3"
+
+router:
+  compute_mode: "fast"
+
+optimization:
+  profile:
+    enabled: true
+    steps: 200
+  compile:
+    enabled: true
+    mode: "reduce-overhead"
+  attention_backend: "auto"
+  data_cache:
+    mode: "build"
+    root: null
+    preencode_to_disk: true
+    tokenizer_batch_size: 128
+  device_profile: "cuda_fast"
+  grad_accumulation_preset: "auto_small"
+  force_fast_tokenizer: true
+  v4_distill:
+    compressed_kv_proxy: true
+    balance_bias_update: true
+    mtp_heads: 1
+    mtp_loss_weight: 0.1

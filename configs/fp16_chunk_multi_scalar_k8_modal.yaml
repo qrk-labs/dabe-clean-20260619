@@ -1,0 +1,15 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_1b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_multi_scalar_k8_modal"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  compression:
+    scalars_per_chunk: 8
+
+  training:
+    eta_stdout: true

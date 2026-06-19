@@ -1,0 +1,66 @@
+{
+  "rank_order": [
+    {
+      "run_root": "experiments/modal_downloads/exp060_modal_output_head_anchor_refine_6k_001",
+      "probe_path": "experiments/modal_downloads/exp060_modal_output_head_anchor_refine_6k_001/interaction_probe_fixedset100_mirror_best.json",
+      "strict_coherent_rate": 0.0,
+      "coherent_rate": 0.0,
+      "val_next_token_acc_last": 0.06632872670888901,
+      "raw_tokens_per_sec": 595047.8560992196,
+      "val_next_chunk_acc_last": 0.0,
+      "output_head_family": "anchor_refine"
+    },
+    {
+      "run_root": "experiments/modal_downloads/exp059_modal_output_head_anchor_sparse_6k_001",
+      "probe_path": "experiments/modal_downloads/exp059_modal_output_head_anchor_sparse_6k_001/interaction_probe_fixedset100_mirror_best.json",
+      "strict_coherent_rate": 0.0,
+      "coherent_rate": 0.0,
+      "val_next_token_acc_last": 0.05875061824917793,
+      "raw_tokens_per_sec": 575095.5200132664,
+      "val_next_chunk_acc_last": 0.0,
+      "output_head_family": "anchor_sparse"
+    },
+    {
+      "run_root": "experiments/modal_downloads/exp061_modal_output_head_dual_task_6k_001",
+      "probe_path": "experiments/modal_downloads/exp061_modal_output_head_dual_task_6k_001/interaction_probe_fixedset100_mirror_best.json",
+      "strict_coherent_rate": 0.0,
+      "coherent_rate": 0.0,
+      "val_next_token_acc_last": 0.05875061824917793,
+      "raw_tokens_per_sec": 562849.7619369264,
+      "val_next_chunk_acc_last": 0.034019533544778824,
+      "output_head_family": "dual_task"
+    }
+  ],
+  "selected_top_k": [
+    {
+      "run_root": "experiments/modal_downloads/exp060_modal_output_head_anchor_refine_6k_001",
+      "probe_path": "experiments/modal_downloads/exp060_modal_output_head_anchor_refine_6k_001/interaction_probe_fixedset100_mirror_best.json",
+      "strict_coherent_rate": 0.0,
+      "coherent_rate": 0.0,
+      "val_next_token_acc_last": 0.06632872670888901,
+      "raw_tokens_per_sec": 595047.8560992196,
+      "val_next_chunk_acc_last": 0.0,
+      "output_head_family": "anchor_refine",
+      "relative_token_acc_gain_vs_exp056": 22.949407581952276,
+      "throughput_ratio_vs_exp057": 0.7650141317777902,
+      "passes_final_gate": false
+    },
+    {
+      "run_root": "experiments/modal_downloads/exp059_modal_output_head_anchor_sparse_6k_001",
+      "probe_path": "experiments/modal_downloads/exp059_modal_output_head_anchor_sparse_6k_001/interaction_probe_fixedset100_mirror_best.json",
+      "strict_coherent_rate": 0.0,
+      "coherent_rate": 0.0,
+      "val_next_token_acc_last": 0.05875061824917793,
+      "raw_tokens_per_sec": 575095.5200132664,
+      "val_next_chunk_acc_last": 0.0,
+      "output_head_family": "anchor_sparse",
+      "relative_token_acc_gain_vs_exp056": 20.213169194648234,
+      "throughput_ratio_vs_exp057": 0.7393627175070209,
+      "passes_final_gate": false
+    }
+  ],
+  "baselines": {
+    "exp056_val_next_token_acc_last": 0.0027695351745933294,
+    "exp057_raw_tokens_per_sec": 777825.9660594873
+  }
+}

@@ -1,0 +1,10 @@
+defaults:
+  - adapter_feasibility_stabilized
+
+experiment:
+  name: "adapter_route_feasibility_stabilized_widthinit"
+  track: "adapter_feasibility"
+
+feasibility:
+  adapter:
+    width_predictor_weight_init_std: 0.02

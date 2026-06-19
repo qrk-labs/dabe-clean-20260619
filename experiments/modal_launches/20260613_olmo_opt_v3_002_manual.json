@@ -1,0 +1,8 @@
+{
+  "launched_at": "2026-06-13T18:12:45+01:00",
+  "command": "modal run -d scripts/modal_feasibility_smoke.py::run_pipeline --config-name feasibility_modal_olmo_opt_v3 --stages tokenizer,dabe_lm,bpe_baseline --periodic-commit-seconds 180 --run-id olmo_opt_v3_002",
+  "app_id": "ap-faTgWO3iiegUzKSFzQVOur",
+  "log_tail_command": "modal app logs ap-faTgWO3iiegUzKSFzQVOur",
+  "status_command": "modal app list --json",
+  "volume_progress_check": "modal volume ls dabe-experiments /experiments/olmo_opt_v3_002"
+}

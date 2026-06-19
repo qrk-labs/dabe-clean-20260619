@@ -1,0 +1,22 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_3b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_2m_unique_3b_saturation_v2"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    # Saturation v2 (balanced):
+    # - keep higher per-step workload than baseline for better GPU saturation,
+    # - but restore more update steps than v1 to protect quality.
+    # raw_tokens/step = 192 * 16 * 64 = 196,608
+    # max_steps=15,259 => ~3,000,041,472 processed raw tokens.
+    batch_size: 192
+    compressed_seq_len: 16
+    max_steps: 15259
+    learning_rate: 2e-4
+    val_check_interval: 400
+    checkpoint_every_n_train_steps: 1000

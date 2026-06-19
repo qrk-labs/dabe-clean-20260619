@@ -1,0 +1,175 @@
+{
+  "status": "ok",
+  "run_id": "exp052_modal_fp16_hier_divreg_001",
+  "output_dir": "/vol/experiments/exp052_modal_fp16_hier_divreg_001",
+  "config_name": "fp16_hierarchical_64_8_1_modal_saturation_v2",
+  "overrides": "fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500 experiment.device=cuda",
+  "config": {
+    "experiment": {
+      "name": "fp16_hierarchical_64_8_1_modal_saturation_v2",
+      "seed": 42,
+      "device": "cuda"
+    },
+    "fp16_chunk": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 20000,
+        "val_samples": 4096,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "compression": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "window_overlap": 0,
+        "dtype": "float16",
+        "tokenizer_batch_size": 64
+      },
+      "model": {
+        "hidden_dim": 768,
+        "num_layers": 12,
+        "num_heads": 12,
+        "ff_dim": 3072,
+        "dropout": 0.1,
+        "attention": {
+          "backend": "auto"
+        }
+      },
+      "training": {
+        "compressed_seq_len": 16,
+        "window_stride": 1,
+        "batch_size": 256,
+        "num_workers": 8,
+        "learning_rate": 0.0002,
+        "weight_decay": 0.01,
+        "max_steps": 4000,
+        "val_check_interval": 500,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 50,
+        "eta_log_interval_steps": 200,
+        "enable_csv_logger": true,
+        "checkpoint_every_n_train_steps": 10000,
+        "checkpoint_save_top_k": 1,
+        "checkpoint_save_last": true,
+        "precision": "16-mixed",
+        "eta_stdout": true,
+        "checkpoint_monitor": "val/next_token_acc",
+        "checkpoint_mode": "max"
+      },
+      "diffusion": {
+        "enabled": true,
+        "latent_dim": 256,
+        "timesteps": 256,
+        "loss_weight": 0.25,
+        "reconstruction_weight": 0.2,
+        "vocab_size": 50257,
+        "chunk_size_tokens": 64,
+        "compute_train_gist_metrics": false
+      },
+      "gate": {
+        "require_stable": true,
+        "require_downward_trend": true,
+        "min_relative_drop": 0.0
+      },
+      "hierarchical": {
+        "enabled": true,
+        "coarse_chunk_size": 64,
+        "mid_chunk_size": 8,
+        "fine_chunk_size": 1,
+        "router_temperature": 1.0,
+        "hard_routing": false,
+        "route_balance_weight": 0.02,
+        "route_entropy_weight": 0.0,
+        "route_target": [
+          0.55,
+          0.3,
+          0.15
+        ],
+        "base_residual_weight": 0.15
+      },
+      "decode_mirror": {
+        "enabled": true,
+        "coarse_stride": 8,
+        "mid_stride": 4,
+        "fine_stride": 1,
+        "loss_weight": 0.1,
+        "coarse_weight": 0.2,
+        "mid_weight": 0.3,
+        "fine_weight": 0.5,
+        "scalar_mid_weight": 0.25,
+        "scalar_fine_weight": 0.25,
+        "infer_coarse_weight": 0.2,
+        "infer_mid_weight": 0.3,
+        "infer_fine_weight": 0.5,
+        "next_token_supervision": {
+          "enabled": true,
+          "loss_weight": 0.1,
+          "sample_batch_size": 4,
+          "position_stride": 8,
+          "max_positions": 8
+        },
+        "diversity_regularization": {
+          "enabled": true,
+          "loss_weight": 0.05,
+          "sample_batch_size": 4,
+          "temperature": 1.0,
+          "entropy_target": 6.0,
+          "entropy_weight": 1.0,
+          "top1_max": 0.35,
+          "top1_weight": 1.0,
+          "adjacent_similarity_weight": 0.1
+        }
+      }
+    },
+    "fp16_chunk_modal": {
+      "use_memmap": true
+    }
+  },
+  "result": {
+    "train": {
+      "stable": true,
+      "nan_batches": 0,
+      "val_loss_first": 1.2008529901504517,
+      "val_loss_last": 1.0641227960586548,
+      "val_trend_pass": true,
+      "diffusion_enabled": true,
+      "val_diffusion_loss_last": 0.09138860553503036,
+      "val_gist_cosine_last": 0.957917332649231,
+      "val_gist_retrieval_top1_last": 0.0002729511179495603,
+      "val_next_token_ce_last": 10.156478881835938,
+      "val_next_token_acc_last": 0.07516609132289886,
+      "val_route_usage_coarse_last": 0.5547468662261963,
+      "val_route_usage_mid_last": 0.29538312554359436,
+      "val_route_usage_fine_last": 0.14986994862556458,
+      "first_batch_seconds": 1.882617995000004,
+      "steps_per_sec": 3.043147482016439,
+      "compressed_tokens_per_sec": 12454.592318929255,
+      "raw_tokens_per_sec": 797093.9084114723,
+      "gpu_mem_peak_mb": 5578.2080078125,
+      "cpu_util_avg": 0.0,
+      "gpu_util_avg": null,
+      "device": "cuda:0",
+      "train_samples": 58575,
+      "val_samples": 10762,
+      "train_chunks": 58591,
+      "val_chunks": 10778,
+      "coarse_chunk_size": 64,
+      "mid_chunk_size": 8,
+      "fine_chunk_size": 1,
+      "gate_pass": true,
+      "metrics_csv_path": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/logs/version_0/metrics.csv",
+      "checkpoint_dir": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/checkpoints",
+      "train_scalars_coarse_path": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/train_scalars_coarse.npy",
+      "train_scalars_mid_path": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/train_scalars_mid.npy",
+      "train_scalars_fine_path": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/train_scalars_fine.npy",
+      "train_chunk_tokens_path": "/vol/experiments/exp052_modal_fp16_hier_divreg_001/train_chunk_tokens.npy",
+      "best_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp052_modal_fp16_hier_divreg_001/checkpoints/best-step-0001500.ckpt",
+      "last_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp052_modal_fp16_hier_divreg_001/checkpoints/last.ckpt",
+      "last_periodic_checkpoint_path": null
+    }
+  }
+}

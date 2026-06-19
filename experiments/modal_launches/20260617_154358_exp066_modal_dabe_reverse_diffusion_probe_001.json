@@ -1,0 +1,10 @@
+{
+  "launched_at": "2026-06-17T15:43:58.658550+00:00",
+  "command": "modal run -d scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_reverse_diffusion_probe --config-name dabe_tokenizer_autoencoder_smoke --stages probe --periodic-commit-seconds 120 --run-id exp066_modal_dabe_reverse_diffusion_probe_001 --overrides 'dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false'",
+  "return_code": -15,
+  "timed_out_waiting_for_local_process": true,
+  "app_id": "ap-H5czLxLwpEeD8uzt8YWQZ1",
+  "log_tail_command": "modal app logs ap-H5czLxLwpEeD8uzt8YWQZ1",
+  "status_command": "modal app list --json",
+  "raw_output": "\u2713 Initialized. View run at \nhttps://modal.com/apps/qrk-labs/main/ap-H5czLxLwpEeD8uzt8YWQZ1\n\u2713 Created objects.\n\u251c\u2500\u2500 \ud83d\udd28 Created mount \n\u2502   /Users/mainasaratsowa/code/qrk/dabe/scripts/modal_dabe_tokenizer_autoencoder\n\u2502   .py\n\u251c\u2500\u2500 \ud83d\udd28 Created mount /Users/mainasaratsowa/code/qrk/dabe/configs\n\u251c\u2500\u2500 \ud83d\udd28 Created mount /Users/mainasaratsowa/code/qrk/dabe/scripts\n\u251c\u2500\u2500 \ud83d\udd28 Created mount /Users/mainasaratsowa/code/qrk/dabe/src\n\u251c\u2500\u2500 \ud83d\udd28 Created function run_tokenizer_autoencoder.\n\u251c\u2500\u2500 \ud83d\udd28 Created function run_tokenizer_autoencoder_sweep.\n\u2514\u2500\u2500 \ud83d\udd28 Created function run_tokenizer_reverse_diffusion_probe."
+}

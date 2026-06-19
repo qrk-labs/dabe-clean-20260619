@@ -1,0 +1,50 @@
+defaults:
+  - fp16_hierarchical_64_8_1_modal_t4
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_modal_dual_task_t4"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    precision: "16-mixed"
+    checkpoint_monitor: "val/next_chunk_acc"
+    checkpoint_mode: "max"
+
+  output_head:
+    enabled: true
+    family: "dual_task"
+    anchor_stride: 8
+    refiner:
+      enabled: false
+    loss_weights:
+      token_ce: 0.25
+      chunk_ce: 0.2
+      diffusion: 0.2
+    chunk_ce:
+      sample_batch_size: 4
+      sequence_stride: 2
+      position_stride: 4
+      max_positions: 16
+      max_sequences: 4
+
+  decode_mirror:
+    enabled: true
+    loss_weight: 0.1
+    coarse_weight: 0.7
+    mid_weight: 0.3
+    fine_weight: 0.0
+    scalar_mid_weight: 0.1
+    scalar_fine_weight: 0.0
+    infer_coarse_weight: 0.7
+    infer_mid_weight: 0.3
+    infer_fine_weight: 0.0
+    next_token_supervision:
+      enabled: true
+      sample_batch_size: 8
+      position_stride: 8
+      max_positions: 8
+    diversity_regularization:
+      enabled: false

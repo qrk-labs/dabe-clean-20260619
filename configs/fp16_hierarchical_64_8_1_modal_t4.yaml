@@ -1,0 +1,18 @@
+defaults:
+  - fp16_hierarchical_64_8_1_exp031_seed
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_modal_t4"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    precision: "bf16-mixed"
+    num_workers: 8
+    eta_log_interval_steps: 200
+    eta_stdout: true
+
+  diffusion:
+    compute_train_gist_metrics: false

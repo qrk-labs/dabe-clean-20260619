@@ -1,0 +1,53 @@
+defaults:
+  - fp16_hierarchical_64_8_1_modal_saturation_v1
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_modal_saturation_v2"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    # T4 is optimized for FP16 throughput; this is the lowest-risk speed lever.
+    precision: "16-mixed"
+    # Keep same saturation batch while reducing optimizer aggressiveness for stability.
+    learning_rate: 2e-4
+    # Select checkpoints by direct token prediction quality, not only surrogate scalar loss.
+    checkpoint_monitor: "val/next_token_acc"
+    checkpoint_mode: "max"
+
+  diffusion:
+    # Lighter diffusion head to reduce per-step cost without changing routing backbone.
+    latent_dim: 256
+
+  decode_mirror:
+    enabled: true
+    coarse_stride: 8
+    mid_stride: 4
+    fine_stride: 1
+    loss_weight: 0.1
+    coarse_weight: 0.2
+    mid_weight: 0.3
+    fine_weight: 0.5
+    scalar_mid_weight: 0.25
+    scalar_fine_weight: 0.25
+    infer_coarse_weight: 0.2
+    infer_mid_weight: 0.3
+    infer_fine_weight: 0.5
+    next_token_supervision:
+      enabled: true
+      loss_weight: 0.1
+      sample_batch_size: 4
+      position_stride: 8
+      max_positions: 8
+    diversity_regularization:
+      enabled: true
+      loss_weight: 0.05
+      sample_batch_size: 4
+      temperature: 1.0
+      entropy_target: 6.0
+      entropy_weight: 1.0
+      top1_max: 0.35
+      top1_weight: 1.0
+      adjacent_similarity_weight: 0.1

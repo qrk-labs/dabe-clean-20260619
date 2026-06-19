@@ -1,0 +1,10 @@
+{
+  "launched_at": "2026-06-17T09:39:08+01:00",
+  "command": "modal run -d scripts/modal_fp16_chunk.py --config-name fp16_chunk_multi_scalar_k8_modal --run-id exp058_modal_fp16_multi_scalar_k8_004 --stages preprocess,train",
+  "app_id": "ap-zmK6OA23OCyNMhBgSxvPO5",
+  "gpu": "T4",
+  "timeout": "3600s",
+  "eta_stdout": true,
+  "log_tail_command": "modal app logs ap-zmK6OA23OCyNMhBgSxvPO5",
+  "status_command": "modal app list --json"
+}

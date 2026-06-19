@@ -1,0 +1,10 @@
+{
+  "launched_at": "2026-06-16T07:00:00+01:00",
+  "profile": "qrk-labs",
+  "command": "modal run -d scripts/modal_fp16_hierarchical.py::run_hierarchical_train --config-name fp16_hierarchical_64_8_1_modal_decode8_t4 --run-id exp058_modal_hier_decode8_2m1b_001 --periodic-commit-seconds 300 --overrides 'fp16_chunk.training.max_steps=30518 fp16_chunk.training.val_check_interval=1000 fp16_chunk.training.checkpoint_every_n_train_steps=2000'",
+  "app_id": "ap-OKC2P7LlkovnyjDII1RBJL",
+  "description": "dabe-fp16-hierarchical",
+  "state_at_launch_check": "ephemeral (detached)",
+  "log_tail_command": "modal app logs ap-OKC2P7LlkovnyjDII1RBJL",
+  "status_command": "modal app list --json"
+}

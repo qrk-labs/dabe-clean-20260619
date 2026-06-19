@@ -1,0 +1,41 @@
+experiment:
+  name: dabe_tokenizer_autoencoder_smoke
+  seed: 42
+  device: auto
+dabe_tokenizer:
+  dataset:
+    dataset_name: __synthetic__
+    train_split: train
+    val_split: validation
+    train_samples: 128
+    val_samples: 32
+    text_field: text
+    allow_synthetic_fallback: true
+    streaming: true
+  codec:
+    tokenizer_name: gpt2
+    force_fast_tokenizer: true
+    chunk_size_tokens: 64
+    chunk_stride_tokens: 64
+    code_bits: 256
+    tokenizer_batch_size: 32
+  model:
+    embed_dim: 64
+    hidden_dim: 256
+    dropout: 0.0
+  training:
+    batch_size: 16
+    num_workers: 0
+    learning_rate: 0.0003
+    weight_decay: 0.01
+    bit_balance_weight: 0.01
+    max_steps: 5
+    val_check_interval: 5
+    grad_clip: 1.0
+    log_every_n_steps: 5
+    enable_csv_logger: true
+    enable_progress_bar: false
+    checkpoint_every_n_train_steps: 5
+    checkpoint_save_top_k: 1
+    checkpoint_save_last: true
+    precision: 32-true

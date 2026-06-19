@@ -1,0 +1,23 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_3b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_2m_unique_32b_8gb_target_v1"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    # 8GB-target saturation profile:
+    # - aggressive per-step workload for higher GPU memory/utilization.
+    # - expanded processed-token budget to preserve optimization updates.
+    # raw_tokens/step = 1536 * 64 * 64 = 6,291,456
+    # max_steps=5,000 => 31,457,280,000 processed raw tokens (~31.5B).
+    batch_size: 1536
+    compressed_seq_len: 64
+    max_steps: 5000
+    learning_rate: 1e-4
+    grad_clip: 0.5
+    val_check_interval: 100
+    checkpoint_every_n_train_steps: 250

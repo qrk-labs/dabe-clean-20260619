@@ -1,0 +1,48 @@
+defaults:
+  - fp16_hierarchical_64_8_1_modal_t4
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_modal_decode8_t4"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    precision: "16-mixed"
+    checkpoint_monitor: "val/next_token_acc"
+    checkpoint_mode: "max"
+
+  output_head:
+    enabled: true
+    family: "anchor_sparse"
+    anchor_stride: 8
+    refiner:
+      enabled: false
+    loss_weights:
+      token_ce: 0.2
+      chunk_ce: 0.0
+      diffusion: 0.25
+
+  decode_mirror:
+    enabled: true
+    coarse_stride: 8
+    mid_stride: 8
+    fine_stride: 8
+    loss_weight: 0.15
+    coarse_weight: 1.0
+    mid_weight: 0.0
+    fine_weight: 0.0
+    scalar_mid_weight: 0.0
+    scalar_fine_weight: 0.0
+    infer_coarse_weight: 1.0
+    infer_mid_weight: 0.0
+    infer_fine_weight: 0.0
+    next_token_supervision:
+      enabled: true
+      loss_weight: 0.2
+      sample_batch_size: 8
+      position_stride: 8
+      max_positions: 8
+    diversity_regularization:
+      enabled: false

@@ -1,0 +1,34 @@
+defaults:
+  - adapter_feasibility
+  - _self_
+
+experiment:
+  name: "adapter_route_feasibility_stabilized"
+  track: "adapter_feasibility"
+
+training:
+  learning_rate: 3e-4
+  adapter_learning_rate: 5e-5
+  weight_decay: 0.01
+  adapter_weight_decay: 0.01
+  max_epochs: 1
+  batch_size: 4
+
+feasibility:
+  adapter:
+    min_bit_width: 8
+    max_bit_width: 24
+    num_header_bits: 4
+    bit_embed_init_std: 0.001
+    width_embed_init_std: 0.001
+    gate_bias_init: -6.0
+    gate_weight_init_std: 0.0
+    width_predictor_weight_init_std: 0.0
+    width_predictor_bias_init: 0.0
+    bit_predictor_weight_init_std: 0.0
+    bit_predictor_bias_init: 0.0
+    residual_scale_init: 0.0
+    use_adapter_norm: true
+  decision_gate:
+    loss_tolerance_ratio: 0.10
+    min_width_std: 0.20

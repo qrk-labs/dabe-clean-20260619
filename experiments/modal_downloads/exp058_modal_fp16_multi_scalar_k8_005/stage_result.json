@@ -1,0 +1,121 @@
+{
+  "status": "ok",
+  "run_id": "exp058_modal_fp16_multi_scalar_k8_005",
+  "stage": "train",
+  "output_dir": "/vol/experiments/exp058_modal_fp16_multi_scalar_k8_005/train",
+  "config_name": "fp16_chunk_multi_scalar_k8_modal",
+  "overrides": [
+    "experiment.device=cuda",
+    "fp16_chunk.training.precision=bf16-mixed",
+    "fp16_chunk.training.num_workers=8",
+    "fp16_chunk.training.eta_stdout=true"
+  ],
+  "config": {
+    "experiment": {
+      "name": "fp16_chunk_multi_scalar_k8_modal",
+      "seed": 42,
+      "device": "cuda"
+    },
+    "fp16_chunk": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 10500,
+        "val_samples": 2048,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "compression": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "window_overlap": 0,
+        "dtype": "float16",
+        "tokenizer_batch_size": 64,
+        "scalars_per_chunk": 8
+      },
+      "model": {
+        "hidden_dim": 256,
+        "num_layers": 4,
+        "num_heads": 4,
+        "ff_dim": 1024,
+        "dropout": 0.1,
+        "attention": {
+          "backend": "auto"
+        }
+      },
+      "training": {
+        "compressed_seq_len": 8,
+        "window_stride": 1,
+        "batch_size": 64,
+        "num_workers": 8,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "max_steps": 30518,
+        "val_check_interval": 1000,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 20,
+        "eta_log_interval_steps": 20,
+        "enable_csv_logger": true,
+        "checkpoint_every_n_train_steps": 2000,
+        "checkpoint_save_top_k": 1,
+        "checkpoint_save_last": true,
+        "precision": "bf16-mixed",
+        "eta_stdout": true
+      },
+      "diffusion": {
+        "enabled": true,
+        "latent_dim": 128,
+        "timesteps": 256,
+        "loss_weight": 0.25,
+        "reconstruction_weight": 0.2,
+        "vocab_size": 50257,
+        "chunk_size_tokens": 64
+      },
+      "gate": {
+        "require_stable": true,
+        "require_downward_trend": true,
+        "min_relative_drop": 0.0
+      }
+    },
+    "fp16_chunk_modal": {
+      "use_memmap": true
+    }
+  },
+  "result": {
+    "train": {
+      "stable": true,
+      "nan_batches": 0,
+      "val_loss_first": 0.04810597002506256,
+      "val_loss_last": 0.009963982738554478,
+      "val_trend_pass": true,
+      "diffusion_enabled": true,
+      "val_diffusion_loss_last": 0.03266030550003052,
+      "val_gist_cosine_last": 0.9993008971214294,
+      "val_gist_retrieval_top1_last": 0.00198566447943449,
+      "first_batch_seconds": 1.7458458470000018,
+      "prep_seconds": 0.11185303299999916,
+      "steps_per_sec": 28.356000655775283,
+      "compressed_tokens_per_sec": 14498.462717368415,
+      "raw_tokens_per_sec": 927901.6139115785,
+      "gpu_mem_peak_mb": 223.3642578125,
+      "cpu_util_avg": 0.0,
+      "gpu_util_avg": null,
+      "device": "cuda:0",
+      "train_samples": 29847,
+      "val_samples": 5162,
+      "train_chunks": 29855,
+      "val_chunks": 5170,
+      "processed_raw_tokens_target": 1000013824,
+      "cached_unique_raw_tokens_equivalent": 1910720,
+      "gate_pass": true,
+      "metrics_csv_path": "/vol/experiments/exp058_modal_fp16_multi_scalar_k8_005/train/logs/version_0/metrics.csv",
+      "checkpoint_dir": "/vol/experiments/exp058_modal_fp16_multi_scalar_k8_005/train/checkpoints",
+      "best_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp058_modal_fp16_multi_scalar_k8_005/train/checkpoints/best-step-0030000.ckpt",
+      "last_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp058_modal_fp16_multi_scalar_k8_005/train/checkpoints/last.ckpt",
+      "last_periodic_checkpoint_path": null
+    }
+  }
+}

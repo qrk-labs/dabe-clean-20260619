@@ -1,0 +1,17 @@
+{
+  "launched_at": "2026-06-17T08:53:30+01:00",
+  "command": "modal run -d scripts/modal_fp16_chunk.py --config-name fp16_chunk_multi_scalar_k8_modal --run-id exp058_modal_fp16_multi_scalar_k8_003 --stages preprocess,train",
+  "return_code": null,
+  "timed_out_waiting_for_local_process": true,
+  "app_id": "ap-L1P8yAgTJqXCJ1zd5ZyDjN",
+  "log_tail_command": "modal app logs ap-L1P8yAgTJqXCJ1zd5ZyDjN",
+  "status_command": "modal app list --json",
+  "autostop": {
+    "enabled": true,
+    "cap_hours": 1,
+    "autostop_pid": 31357,
+    "autostop_log": "/tmp/exp058_autostop_003.log",
+    "command": "modal app stop ap-L1P8yAgTJqXCJ1zd5ZyDjN"
+  },
+  "raw_output": "nohup background launch"
+}

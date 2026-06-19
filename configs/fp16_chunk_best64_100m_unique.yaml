@@ -1,0 +1,28 @@
+defaults:
+  - fp16_chunk_best64_frozen
+  - _self_
+
+experiment:
+  name: "fp16_chunk_best64_100m_unique"
+  seed: 42
+  device: "auto"
+
+fp16_chunk:
+  dataset:
+    train_samples: 560000
+    val_samples: 10000
+    streaming: true
+    allow_synthetic_fallback: false
+
+  training:
+    max_steps: 12000
+    val_check_interval: 200
+    checkpoint_every_n_train_steps: 1000
+
+  # Keep frozen best architecture/objective while scaling token budget only.
+  compression:
+    chunk_size_tokens: 64
+
+  diffusion:
+    enabled: true
+    chunk_size_tokens: 64

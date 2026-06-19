@@ -1,0 +1,21 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_3b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_2m_unique_3b_saturation_v1"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    # Saturation profile:
+    # - increase per-step compute from 64*8 to 256*32 compressed tokens.
+    # - keep processed raw-token budget near ~3B for comparability.
+    # raw_tokens/step = 256 * 32 * 64 = 524,288
+    # max_steps=5,723 => ~3,000,500,224 processed raw tokens.
+    batch_size: 256
+    compressed_seq_len: 32
+    max_steps: 5723
+    val_check_interval: 200
+    checkpoint_every_n_train_steps: 500

@@ -1,0 +1,80 @@
+{
+  "run_id": "fp16_chunk_window8_seed44_smoke_20260613_215502",
+  "experiment": "fp16_chunk_window8_seed44_smoke",
+  "track": "fp16_chunk_feasibility",
+  "config": {
+    "experiment": {
+      "name": "fp16_chunk_window8_seed44_smoke",
+      "seed": 44,
+      "device": "auto"
+    },
+    "fp16_chunk": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 4096,
+        "val_samples": 512,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "compression": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 8,
+        "window_overlap": 0,
+        "dtype": "float16",
+        "tokenizer_batch_size": 64
+      },
+      "model": {
+        "hidden_dim": 256,
+        "num_layers": 4,
+        "num_heads": 4,
+        "ff_dim": 1024,
+        "dropout": 0.1,
+        "attention": {
+          "backend": "auto"
+        }
+      },
+      "training": {
+        "compressed_seq_len": 8,
+        "window_stride": 1,
+        "batch_size": 64,
+        "num_workers": 0,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "max_steps": 1500,
+        "val_check_interval": 100,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 20,
+        "precision": "32-true"
+      },
+      "gate": {
+        "require_stable": true,
+        "require_downward_trend": true,
+        "min_relative_drop": 0.0
+      }
+    }
+  },
+  "fp16_chunk": {
+    "stable": true,
+    "nan_batches": 0,
+    "val_loss_first": 0.00179619574919343,
+    "val_loss_last": 0.001707918127067387,
+    "val_trend_pass": true,
+    "first_batch_seconds": 0.3693825420923531,
+    "steps_per_sec": 16.903210348898327,
+    "compressed_tokens_per_sec": 8654.443698635943,
+    "raw_tokens_per_sec": 69235.54958908755,
+    "gpu_mem_peak_mb": 0.0,
+    "cpu_util_avg": 53.02347005208333,
+    "gpu_util_avg": null,
+    "device": "mps:0",
+    "train_samples": 104411,
+    "val_samples": 12613,
+    "train_chunks": 104419,
+    "val_chunks": 12621,
+    "gate_pass": true
+  }
+}

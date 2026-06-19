@@ -1,0 +1,23 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_3b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_2m_unique_32b_8gb_target_v2"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  training:
+    # 8GB-near-limit v2:
+    # - keep seq_len=64, reduce batch to stay just below OOM threshold
+    #   from v1 while still pushing memory/throughput.
+    # raw_tokens/step = 1184 * 64 * 64 = 4,849,664
+    # max_steps=6,500 => 31,522,816,000 processed raw tokens (~31.5B).
+    batch_size: 1184
+    compressed_seq_len: 64
+    max_steps: 6500
+    learning_rate: 1e-4
+    grad_clip: 0.5
+    val_check_interval: 100
+    checkpoint_every_n_train_steps: 250

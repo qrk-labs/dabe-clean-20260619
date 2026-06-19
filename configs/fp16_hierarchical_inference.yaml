@@ -1,0 +1,19 @@
+fp16_hierarchical_inference:
+  decode_mode: mirror_decoder
+  runtime_mode: quality
+  continuation_chunks: 4
+  compressed_seq_len: 16
+  fast_decode_interval: 2
+  fast_refine_tokens: 16
+  repetition_ngram: 4
+  repetition_fraction_threshold: 0.35
+  ttt_enabled: false
+  ttt_steps: 8
+  ttt_lr: 0.001
+  ttt_batch_size: 8
+  ttt_max_windows: 32
+  ttt_position_stride: 8
+  ttt_max_positions: 8
+  ttt_scalar_loss_weight: 0.05
+  ttt_next_step_targets: true
+  ttt_grad_clip: 1.0

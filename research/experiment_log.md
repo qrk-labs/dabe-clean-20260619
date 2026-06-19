@@ -1,0 +1,5147 @@
+# Experiment Log
+
+## EXP-089: Action-Value Variable Window Router
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-088 failed because the window router was trained on hardness quantiles rather than actual distortion improvement, and because the decode path soft-averaged code bits. A better fixed-slab variable-window pilot should keep per-block code bits intact, evaluate fine/medium/full candidate decodes, train the router toward the action with lowest block Hamming deviation, and penalize actions that do not improve over the baseline. This should prevent the fine-everywhere collapse and make variable-window routing optimize chunk deviation directly.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned overrides (`decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight>0`, `variable_window_nonimprove_weight>0`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` action-value variable-window router (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Keep local per-block code bits intact for all window candidates.
+- Add action-value teacher targets from candidate block Hamming deviation, not loss quantiles.
+- Log oracle/chosen/expected deviation, regret, non-improvement penalty, and candidate action deviation means.
+- Local compile checks pass before launch.
+- If launched, improve over EXP-088 and approach EXP-087 best on chunk deviation while preserving lower observed bitrate.
+
+### Decisions
+- [x] Use actual candidate decode deviation as the router target.
+- [x] Penalize actions that do not improve over the baseline/provisional decode.
+- [x] Implement model, loss, metrics, and tests.
+- [x] Pass Python compile checks for model, runner, and tests.
+- [x] Launch Modal pilot after local validation.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp089_modal_dabe_action_window_router_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-qtUJXlF0p823VzEtdlgvtb` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_070840_exp089_modal_dabe_action_window_router_001.json` |
+| Overrides | EXP-087 lead settings plus `decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `variable_window_loss_weight=0.1`, `variable_window_nonimprove_weight=0.1`, `variable_window_nonimprove_margin=0.5`, `variable_window_cost_weight=0.0` |
+| Early status | Trainer startup completed; observed `[eta] step=100/12000 sps=5.80 eta_min=34.2` before detaching local log stream |
+
+### Results
+Run timed out before writing `stage_result.json`; recovered `metrics.csv`, `config.yaml`, `best-step-0010000.ckpt`, and reconstructed a partial summary at `experiments/modal_downloads/exp089_modal_dabe_action_window_router_001/reconstructed_result.json`.
+
+| Metric | EXP-089 action-value windows | EXP-088 quantile windows | EXP-087 best | Delta vs EXP-088 |
+|--------|------------------------------|--------------------------|--------------|------------------|
+| run completion | timeout before summary JSON | timeout before summary JSON | complete | same failure mode |
+| last validation step | `9830` | `11242` | `12000` | `-1412` steps |
+| observed effective bits/token | `18.29175` | `19.46092` | `20.37236` | `-1.16917` |
+| variable-window code bits/chunk | `822.16589` | `910.26971` | N/A | `-88.10382` |
+| mean soft lookup K | `15.84117` | `15.23769` | `12.71961` | `+0.60348` |
+| mean threshold-active K | `16.42043` | `14.64619` | `9.03257` | `+1.77424` |
+| token_acc | `0.87508` | `0.85820` | `0.91547` | `+0.01688` |
+| token_top5_acc | `0.97941` | `0.97430` | `0.98558` | `+0.00511` |
+| token_top10_acc | `0.98577` | `0.98308` | `0.98989` | `+0.00269` |
+| exact chunk accuracy | `0.00222` | `0.00074` | `0.02221` | `+0.00148` |
+| chunk deviation mean | `7.99482` | `9.07550` | `5.41007` | `-1.08068` |
+| chunk deviation p90 | `12.47994` | `14.07357` | `9.04678` | `-1.59363` |
+| chunk deviation p95 | `13.86432` | `15.70592` | `10.25307` | `-1.84160` |
+| variable-window acc | `0.71336` | `0.25000` | N/A | `+0.46336` |
+| predicted fine/medium/full | `0.99944 / 0.00056 / 0.00000` | `1.00000 / 0.00000 / 0.00000` | N/A | still argmax-fine |
+| target fine/medium/full | `0.71318 / 0.23001 / 0.05681` | `0.25000 / 0.25019 / 0.49981` | N/A | action-value teacher shifted target toward useful fine regions |
+| variable-window base deviation | `10.13749` | N/A | N/A | new metric |
+| variable-window oracle deviation | `5.64175` | N/A | N/A | new metric |
+| variable-window chosen deviation | `6.04534` | N/A | N/A | new metric |
+| variable-window regret | `0.40359` | N/A | N/A | new metric |
+| variable-window non-improve rate | `0.03294` | N/A | N/A | new metric |
+
+### Key Observations
+- Action-value supervision fixed the worst part of EXP-088: validation accuracy and chunk deviation both improved despite fewer validation steps and lower observed bitrate.
+- The argmax router still nearly always chooses fine windows, but the soft distribution is no longer equivalent to all-fine: expected window size is `24.35` tokens and variable-window code bits fell to `822.17` bits/chunk.
+- The action-value teacher is meaningful: oracle candidate deviation is `5.64`, chosen deviation is `6.05`, and non-improvement rate is only `3.29%`.
+- The remaining gap to EXP-087 is likely not target quality alone. The mixed-window decode path lowers bitrate but weakens reconstruction; the lexical lookup compensates by using more active slots.
+
+### Decisions
+- [x] Treat timeout as a partial result, not a null run.
+- [ ] Consider shortening pilots to `10000` steps or increasing timeout when action-value candidate scoring is enabled.
+- [ ] Next architecture should address the soft/argmax mismatch: either anneal router temperature/hard straight-through windows, or score budgeted action choices directly against expected deviation.
+
+### Status: [FAILED]
+
+## EXP-088: Gist-Residual Variable Windows
+
+**Date:** 2026-06-18
+**Hypothesis:** EXP-087 established that sharper residual routing improves reconstruction at modest bitrate cost. The next step is to let the tokenizer vary outer window granularity: hard/high-residual regions should use fine 16-token windows, medium regions should use 32-token windows, and easy/low-residual regions should use full 64-token windows. If this works, the model should preserve the EXP-087 router gains while reporting lower expected code bits for easy regions.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal overrides (`decoder_mode=gist_residual_variable_windows`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight>0`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` variable-window decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Add a shape-validated `gist_residual_variable_windows` decoder mode.
+- Log variable-window router loss/accuracy, predicted fine/medium/full fractions, target fractions, expected window tokens, and expected variable-window code bits per chunk.
+- Training loss supports variable-window supervision without breaking existing EXP-087 metrics.
+- Local tests or compile checks pass before any Modal launch.
+- If launched, compare against EXP-087 best (`token_acc=0.91547`, `chunk deviation mean=5.41007`, observed bpt `20.37236`).
+
+### Decisions
+- [x] Start with variable windows inside fixed 64-token training slabs to avoid changing dataloader/batching and confounding the architecture test.
+- [x] Use 16-token hierarchical blocks as the atomic fine unit; medium windows merge adjacent 16-token blocks; full windows span the 64-token slab.
+- [x] Implement model, loss, and metrics.
+- [x] Add focused shape/gradient tests.
+- [x] Pass Python compile checks for model, runner, and tests.
+- [x] Launch Modal pilot after local validation.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp088_modal_dabe_gist_residual_variable_windows_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-KE7NLRP8oyx6TmuBg0tBJU` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_001000_exp088_modal_dabe_gist_residual_variable_windows_001.json` |
+| Overrides | EXP-087 lead settings plus `decoder_mode=gist_residual_variable_windows`, `variable_window_loss_weight=0.1`, `variable_window_cost_weight=0.0` |
+| Early status | Trainer startup completed; observed `[eta] step=100/12000 sps=6.79 eta_min=29.2` before detaching local log stream |
+
+### Results
+| Metric | EXP-088 variable windows | EXP-087 best | Delta |
+|--------|--------------------------|--------------|-------|
+| run completion | timeout before summary JSON | complete | negative |
+| last validation step | `11242` | `12000` | `-758` steps |
+| observed effective bits/token | `19.46092` | `20.37236` | `-0.91144` |
+| variable-window code bits/chunk | `910.26971` | N/A | lower than raw `1024` |
+| mean soft lookup K | `15.23769` | `12.71961` | `+2.51808` |
+| mean threshold-active K | `14.64619` | `9.03257` | `+5.61362` |
+| keep probability mean | `0.47618` | `0.39749` | `+0.07869` |
+| token_acc | `0.85820` | `0.91547` | `-0.05727` |
+| token_top5_acc | `0.97430` | `0.98558` | `-0.01128` |
+| token_top10_acc | `0.98308` | `0.98989` | `-0.00681` |
+| chunk deviation mean | `9.07550` | `5.41007` | `+3.66543` |
+| chunk deviation rate mean | `0.14180` | `0.08453` | `+0.05727` |
+| chunk deviation p50 | `8.77720` | `5.11029` | `+3.66691` |
+| chunk deviation p90 | `14.07357` | `9.04678` | `+5.02679` |
+| chunk deviation p95 | `15.70592` | `10.25307` | `+5.45285` |
+| chunk deviation max | `17.84752` | `12.18653` | `+5.66099` |
+| exact_16token_block_avg | `0.14804` | `0.30126` | `-0.15322` |
+| exact_64token_chunk_acc | `0.00074` | `0.02221` | `-0.02147` |
+| lookup token acc | `0.79337` | `0.84727` | `-0.05390` |
+| non-lookup token acc | `0.87754` | `0.92665` | `-0.04911` |
+
+### Variable-Window Metrics
+| Metric | Value |
+|--------|-------|
+| variable window loss | `1.74459` |
+| variable window cost loss | `0.88894` |
+| variable window accuracy | `0.25` |
+| predicted fine fraction | `1.0` |
+| predicted medium fraction | `0.0` |
+| predicted full fraction | `0.0` |
+| target fine fraction | `0.25` |
+| target medium fraction | `0.25019` |
+| target full fraction | `0.49981` |
+| expected window tokens | `22.04551` |
+| expected code bits/chunk | `910.26971` |
+
+### Router/Lookup Metrics
+| Metric | Value |
+|--------|-------|
+| gist loss | `2.12645` |
+| residual router loss | `0.66939` |
+| residual router acc | `0.68854` |
+| residual high recall | `0.49589` |
+| residual high precision | `0.65184` |
+| residual high fraction | `0.19113` |
+| residual medium fraction | `0.20229` |
+| residual fine region fraction | `0.39342` |
+| selector recall@active-K against high-residual zones | `0.60141` |
+| selector precision@active-K against high-residual zones | `0.67503` |
+| lookup slot cost loss | `0.47623` |
+
+### Exact Block Accuracy
+| Block | Value |
+|-------|-------|
+| block 0 | `0.28497` |
+| block 1 | `0.12139` |
+| block 2 | `0.09771` |
+| block 3 | `0.08808` |
+
+### Key Observations
+- This is a negative result for the first variable-window implementation. It reduced observed bitrate (`19.46` vs EXP-087 best `20.37`) but quality collapsed: token accuracy fell to `0.85820`, and mean chunk deviation rose to `9.07550`.
+- The window router collapsed to a degenerate argmax policy: predicted fine fraction is `1.0`, while the teacher target distribution is roughly `25%` fine, `25%` medium, `50%` full.
+- Despite predicting fine windows everywhere, the soft expected code budget is only `910.27` bits/chunk because the probability distribution still leaves mass on medium/full classes. This mismatch means the model is not learning a clean discrete window policy.
+- Lookup compensated by using more active slots (`14.65` threshold-active K vs EXP-087 best `9.03`), but it could not recover reconstruction quality.
+- The likely cause is that the variable-window path averages/soft-mixes block bits before decoding, which destroys local code specificity while also making the supervised window target fight the reconstruction objective.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp088_modal_dabe_gist_residual_variable_windows_001/` |
+| Modal run root | `/experiments/exp088_modal_dabe_gist_residual_variable_windows_001/` |
+| Pulled files | `config.yaml`, `logs/version_0/metrics.csv`, `logs/version_0/hparams.yaml` |
+| Reconstructed summary | `experiments/modal_downloads/exp088_modal_dabe_gist_residual_variable_windows_001/reconstructed_result.json` |
+| Checkpoints observed remotely | `best-step-0010000.ckpt`, `last.ckpt` |
+
+### Decisions
+- [x] Treat the first variable-window path as a useful negative result.
+- [x] Do not promote `gist_residual_variable_windows` as implemented.
+- [ ] If revisiting variable windows, avoid soft averaging of code bits; use separate decoders/gates or discrete straight-through routing over intact 16/32/64 windows.
+- [ ] Prefer a softer budget controller on the EXP-087 architecture before further variable-window dataloader work.
+
+### Status: [FAILED]
+
+## EXP-087: Gist-Residual Router/Cost Sweep
+
+**Date:** 2026-06-18
+**Hypothesis:** EXP-086 showed that a coarse gist stream plus residual-routed fine lookup improves the rate-distortion curve. The next bottleneck is router sharpness versus lookup cost. Increasing residual-router supervision should improve high-zone recall/precision and reduce chunk deviation, while increasing slot-cost pressure should reduce observed bits/token and active K. A compact grid over these two weights should identify whether the lead architecture should next optimize router quality or budget pressure.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight in {0.1,0.2}`, `lookup_slot_cost_weight in {0.02,0.04}`, TinyStories `4096/512`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- All variants run sequentially in one T4 Modal app/container.
+- Training remains stable (`nan_batches=0`) for each child run.
+- Results include token accuracy, observed effective bits/token, mean soft K, threshold-active K, chunk deviation distribution, residual router accuracy, high-zone recall/precision, and fine-region fraction.
+- At least one variant improves EXP-086's `5.63435` mean chunk deviation or `0.91196` token accuracy without exceeding EXP-085 K=20's `22.32022` observed bits/token.
+- At least one variant tests whether higher slot cost can keep quality near EXP-086 while reducing observed bits/token below `20.0`.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp087_modal_dabe_gist_residual_router_sweep_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `9000s` parent function cap |
+| Router weights | `0.1`, `0.2` |
+| Slot cost weights | `0.02`, `0.04` |
+| Child variants | `exp087_router_w0p1_cost0p02`, `exp087_router_w0p1_cost0p04`, `exp087_router_w0p2_cost0p02`, `exp087_router_w0p2_cost0p04` |
+| Raw code width | `1024` bits |
+| Lookup candidate list | `Kmax=32` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-KGyISda5nOnh26BTXkbONj` |
+| Launch contract | `experiments/modal_launches/20260618_210414_exp087_modal_dabe_gist_residual_router_sweep_001.json` |
+| Final status | completed cleanly; stopped at `2026-06-18 23:40:36 +01:00` |
+
+### Results
+| Metric | router `0.1`, cost `0.02` | router `0.1`, cost `0.04` | router `0.2`, cost `0.02` | router `0.2`, cost `0.04` | EXP-086 baseline |
+|--------|----------------------------|----------------------------|----------------------------|----------------------------|------------------|
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` | `true` / `0` | `true` / `0` |
+| observed effective bits/token | `20.03874` | `19.06757` | `20.37236` | `19.29576` | `20.03874` |
+| mean soft lookup K | `11.74905` | `8.92385` | `12.71961` | `9.58768` | `11.74905` |
+| mean threshold-active K | `6.06366` | `1.15026` | `9.03257` | `1.49667` | `6.06366` |
+| keep probability mean | `0.36716` | `0.27887` | `0.39749` | `0.29962` | `0.36716` |
+| token_acc | `0.91196` | `0.89430` | `0.91547` | `0.89496` | `0.91196` |
+| token_top5_acc | `0.98381` | `0.97825` | `0.98558` | `0.98138` | `0.98381` |
+| token_top10_acc | `0.98876` | `0.98505` | `0.98989` | `0.98720` | `0.98876` |
+| chunk deviation mean | `5.63435` | `6.76462` | `5.41007` | `6.72243` | `5.63435` |
+| chunk deviation rate mean | `0.08804` | `0.10570` | `0.08453` | `0.10504` | `0.08804` |
+| chunk deviation p50 | `5.33679` | `6.39156` | `5.11029` | `6.40637` | `5.33679` |
+| chunk deviation p90 | `9.36684` | `10.96787` | `9.04678` | `11.02280` | `9.36684` |
+| chunk deviation p95 | `10.70615` | `12.22243` | `10.25307` | `12.31480` | `10.70615` |
+| chunk deviation max | `13.09474` | `14.38416` | `12.18653` | `14.54478` | `13.09474` |
+| exact_16token_block_avg | `0.28923` | `0.22761` | `0.30126` | `0.23427` | `0.28923` |
+| exact_64token_chunk_acc | `0.01850` | `0.01036` | `0.02221` | `0.00740` | `0.01850` |
+| lookup token acc | `0.84833` | `0.79524` | `0.84727` | `0.77195` | `0.84833` |
+| non-lookup token acc | `0.91852` | `0.89613` | `0.92665` | `0.89791` | `0.91852` |
+
+### Router Metrics
+| Metric | router `0.1`, cost `0.02` | router `0.1`, cost `0.04` | router `0.2`, cost `0.02` | router `0.2`, cost `0.04` |
+|--------|----------------------------|----------------------------|----------------------------|----------------------------|
+| gist loss | `1.73492` | `1.88406` | `1.71128` | `1.90133` |
+| residual router loss | `0.69558` | `0.71073` | `0.59726` | `0.63861` |
+| residual router acc | `0.66717` | `0.65867` | `0.71823` | `0.68545` |
+| residual high recall | `0.48614` | `0.46962` | `0.56916` | `0.50644` |
+| residual high precision | `0.59553` | `0.57124` | `0.66163` | `0.59587` |
+| residual high fraction | `0.20467` | `0.20620` | `0.21564` | `0.21306` |
+| residual medium fraction | `0.17856` | `0.19577` | `0.22169` | `0.22082` |
+| residual fine region fraction | `0.38323` | `0.40197` | `0.43733` | `0.43388` |
+| selector recall@active-K against high-residual zones | `0.28620` | `0.05864` | `0.42404` | `0.07533` |
+| selector precision@active-K against high-residual zones | `0.77136` | `0.81347` | `0.77257` | `0.81833` |
+| lookup slot cost loss | `0.36719` | `0.27875` | `0.39759` | `0.29956` |
+
+### Exact Block Accuracy
+| Block | router `0.1`, cost `0.02` | router `0.1`, cost `0.04` | router `0.2`, cost `0.02` | router `0.2`, cost `0.04` |
+|-------|----------------------------|----------------------------|----------------------------|----------------------------|
+| block 0 | `0.39600` | `0.36491` | `0.40785` | `0.37232` |
+| block 1 | `0.27017` | `0.19689` | `0.29386` | `0.20133` |
+| block 2 | `0.24722` | `0.16506` | `0.26055` | `0.17321` |
+| block 3 | `0.24352` | `0.18357` | `0.24278` | `0.19023` |
+
+### Key Observations
+- Higher router supervision is clearly beneficial at the original cost pressure: router weight `0.2`, cost `0.02` improves token accuracy from `0.91196` to `0.91547`, mean chunk deviation from `5.63435` to `5.41007`, p90 from `9.36684` to `9.04678`, and exact chunk accuracy from `0.01850` to `0.02221`.
+- Router quality improves materially with weight `0.2`: residual router accuracy rises `0.66717 -> 0.71823`, high-zone recall `0.48614 -> 0.56916`, and high-zone precision `0.59553 -> 0.66163`.
+- The improvement is not free, but it is cheap: observed effective bits/token rises only `20.03874 -> 20.37236`, still well below EXP-085 target-K=20 (`22.32022`) while beating its token accuracy (`0.91547` vs `0.91158`) and chunk deviation (`5.41007` vs `5.65877`).
+- Doubling slot cost to `0.04` over-prunes the fine lookup stream. Both high-cost variants reduce observed bits/token below `20`, but collapse threshold-active K to about `1-1.5`, hurting token accuracy (`~0.895`) and chunk deviation (`~6.72-6.76`).
+- The high-cost variants retain high selector precision but lose recall, which is the wrong failure mode for reconstruction: the model keeps only very safe holes and misses too many needed lexical repairs.
+- The lead setting is now `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp087_modal_dabe_gist_residual_router_sweep_001/` |
+| Modal run root | `/experiments/exp087_modal_dabe_gist_residual_router_sweep_001/` |
+| Pulled files | parent `stage_result.json`, `pipeline_summary.json`; child `stage_result.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Use EXP-086 as the baseline architecture.
+- [x] Keep outer chunk size fixed at `64` until router/cost behavior is clearer.
+- [x] Keep `lookup_slot_target_weight=0.0` so budget pressure comes from learned slot cost, not an explicit target K.
+- [x] Launch detached Modal sweep and capture app ID.
+- [x] Pull lightweight artifacts and compare against EXP-086/EXP-085.
+- [x] Promote `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02` as the new lead setting.
+- [ ] Avoid blunt `lookup_slot_cost_weight=0.04`; if lower bitrate is needed, test gentler values such as `0.025` or `0.03`.
+- [ ] Next architecture step should preserve router weight `0.2` and add either true variable outer chunk sizing or a softer budget controller.
+
+### Status: [COMPLETE]
+
+## EXP-086: Coarse Gist + Residual Fine Router
+
+**Date:** 2026-06-18
+**Hypothesis:** A two-stream tokenizer can separate cheap semantic gist compression from expensive lexical precision. A coarse hierarchical gist decoder should identify residual-loss structure, while an autoregressive-style residual router learns high/medium/low information zones and activates a fine lookup/attention stream only where precision is useful. This should reduce chunk deviation relative to fixed K=16 and approach the ranked-halting Kmax=32 curve without a prefixed K budget.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.1`, `lookup_slot_cost_weight=0.02`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` gist/residual router (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Logs include gist CE, router CE/accuracy, high-zone recall/precision, fine active region size, observed effective bits/token, and chunk deviation metrics.
+- Improves over fixed K=16 (`token_acc=0.84751`, chunk deviation to be measured in new runs) and ideally approaches EXP-084/085 ranked-halting quality while learning interpretable high/med/low zones.
+- Fine region size is learned from residual uncertainty rather than set by a prefixed K schedule.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp086_modal_dabe_gist_residual_router_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Outer chunk size | fixed `64` tokens for comparability |
+| Gist width | `1024` bits |
+| Fine candidate list | `Kmax=32` |
+| Fine budget | learned slot halting, no target K |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-WLTB5F15VjWoVV7o8LFerL` |
+| Launch contract | `experiments/modal_launches/20260618_183653_exp086_modal_dabe_gist_residual_router_001.json` |
+| Final status | completed cleanly; stopped at `2026-06-18 20:03:27 +01:00` |
+
+### Results
+| Metric | EXP-086 gist + residual router | EXP-085 halting target K=20 | EXP-084 halting target K=16 | EXP-083 fixed K=32 |
+|--------|--------------------------------|-----------------------------|-----------------------------|--------------------|
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` | `true` / `0` |
+| observed effective bits/token | `20.03874` | `22.32022` | `21.84543` | `27.0` |
+| mean soft lookup K | `11.74905` | `18.38610` | `17.00488` | `32.0` |
+| mean threshold-active K | `6.06366` | `22.61288` | `20.74759` | `32.0` |
+| keep probability mean | `0.36716` | `0.57457` | `0.53140` | N/A |
+| val loss | `0.87985` | N/A | `0.39307` | `0.35712` |
+| token_acc | `0.91196` | `0.91158` | `0.91025` | `0.91882` |
+| token_top5_acc | `0.98381` | `0.98795` | `0.98787` | `0.98791` |
+| token_top10_acc | `0.98876` | `0.99208` | `0.99236` | `0.99220` |
+| chunk deviation mean | `5.63435` | `5.65877` | `5.74389` | N/A |
+| chunk deviation rate mean | `0.08804` | `0.08842` | `0.08975` | N/A |
+| chunk deviation p50 | `5.33679` | `5.24574` | `5.49593` | N/A |
+| chunk deviation p90 | `9.36684` | `9.46928` | `9.52331` | N/A |
+| chunk deviation p95 | `10.70615` | `10.97358` | `10.87957` | N/A |
+| chunk deviation max | `13.09474` | `13.98668` | `13.34197` | N/A |
+| exact_16token_block_avg | `0.28923` | `0.29478` | `0.28442` | `0.32180` |
+| exact_64token_chunk_acc | `0.01850` | `0.01628` | `0.01480` | `0.01554` |
+| lookup token acc | `0.84833` | `0.88653` | `0.88393` | `0.90822` |
+| non-lookup token acc | `0.91852` | `0.92531` | `0.92287` | `0.92943` |
+
+### Router Metrics
+| Metric | Value |
+|--------|-------|
+| gist loss | `1.73492` |
+| residual router loss | `0.69558` |
+| residual router acc | `0.66717` |
+| residual high recall | `0.48614` |
+| residual high precision | `0.59553` |
+| residual high fraction | `0.20467` |
+| residual medium fraction | `0.17856` |
+| residual fine region fraction | `0.38323` |
+| selector recall@active-K against high-residual zones | `0.28620` |
+| selector precision@active-K against high-residual zones | `0.77136` |
+| lookup gate mean | `0.98238` |
+| lookup slot cost loss | `0.36719` |
+
+### Exact Block Accuracy
+| Block | EXP-086 gist + residual router | EXP-085 halting target K=20 | EXP-084 halting target K=16 | EXP-083 fixed K=32 |
+|-------|--------------------------------|-----------------------------|-----------------------------|--------------------|
+| block 0 | `0.39600` | `0.42413` | `0.40563` | `0.44264` |
+| block 1 | `0.27017` | `0.27461` | `0.25907` | `0.31384` |
+| block 2 | `0.24722` | `0.23686` | `0.23908` | `0.26425` |
+| block 3 | `0.24352` | `0.24352` | `0.23390` | `0.26647` |
+
+### Key Observations
+- The split-tokenizer hypothesis is supported: EXP-086 reaches `0.91196` token accuracy and `5.63435` mean chunk deviation at only `20.03874` observed bits/token, beating the EXP-085 target-K=20 distortion point while spending `2.28` fewer effective bits/token.
+- The learned fine stream is substantially cheaper than ranked halting alone: soft K drops from EXP-085 K=20's `18.38610` to `11.74905`, and threshold-active K drops from `22.61288` to `6.06366`.
+- Chunk deviation improves most clearly in the tail: p90 improves from `9.46928` to `9.36684`, p95 from `10.97358` to `10.70615`, and max from `13.98668` to `13.09474`.
+- The router is useful but not yet sharp: residual high recall is only `0.48614` and precision `0.59553`, so there is meaningful headroom in zone identification.
+- Lookup-token accuracy is lower than prior halting runs (`0.84833` vs EXP-085 K=20 `0.88653`), but non-lookup reconstruction and global deviation remain strong. This suggests the gist stream is carrying more of the burden and the fine stream is being used sparingly rather than as a broad copy mechanism.
+- Exact full-chunk accuracy remains noisy, but EXP-086's `0.01850` is the best observed among the compared runs despite the lower bitrate.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp086_modal_dabe_gist_residual_router_001/` |
+| Modal run root | `/experiments/exp086_modal_dabe_gist_residual_router_001/` |
+| Pulled files | `stage_result.json`, `pipeline_summary.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Start with fixed outer chunk size and optimize fine-region size inside the chunk.
+- [x] Use teacher residual loss from the gist decoder to supervise high/medium/low information zones.
+- [x] Implement model and metrics.
+- [x] Launch detached Modal run and capture app ID.
+- [x] Pull lightweight artifacts and compare against EXP-084/085.
+- [x] Treat coarse gist + residual fine routing as the new lead rate-distortion architecture.
+- [ ] Improve router sharpness before adding true variable outer chunk sizing.
+- [ ] Run a cost-weight/router-weight sweep to see whether the same architecture can preserve quality at lower active K or push toward the fixed K=32 upper envelope.
+
+### Status: [COMPLETE]
+
+## Metric Protocol Update: Chunk Deviation
+
+**Date:** 2026-06-18
+**Rationale:** Exact 64-token chunk accuracy is too sparse for the current tokenizer autoencoder regime: two decoded chunks with 1 wrong token and 40 wrong tokens both count as non-exact. Future runs should treat fixed-length Hamming deviation per chunk as the primary sequence-level reconstruction metric, while retaining exact chunk accuracy only as a legacy/upper-tail metric.
+
+### Definition
+- `chunk_deviation_mean`: average number of wrong token positions per decoded chunk.
+- `chunk_deviation_rate_mean`: `chunk_deviation_mean / chunk_size_tokens`.
+- `chunk_deviation_p50`, `chunk_deviation_p90`, `chunk_deviation_p95`, `chunk_deviation_max`: distributional chunk-level Hamming deviation counts.
+
+### Implementation
+- [x] Add training/validation logs for `chunk_deviation_*`.
+- [x] Add result payload fields `val_chunk_deviation_*_last`.
+- [x] Add reverse-diffusion probe chunk deviation metrics.
+- [x] Add decode diagnostics chunk deviation metrics and per-sample deviation.
+- [x] Keep `exact_chunk_acc` for backward compatibility, but no longer use it as the main sequence-level quality metric.
+
+## EXP-085: Ranked Halting Rate-Distortion Sweep
+
+**Date:** 2026-06-18
+**Hypothesis:** Ranked lexical slot halting should produce a smooth rate-distortion curve as the target soft lookup budget changes. If target K values `12`, `16`, and `20` monotonically trade observed effective bits/token for lower chunk deviation, then slot halting becomes a publishable adaptive attention-budget mechanism rather than a one-off result.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal sweep overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `lookup_slot_cost_weight=0.02`, `lookup_slot_target_weight=0.02`, `lookup_slot_target_k in {12,16,20}`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` ranked slot-halting decoder with chunk deviation metrics (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- All target-K variants run sequentially in one T4 Modal app/container.
+- Training remains stable (`nan_batches=0`) for each child run.
+- Results include `val_chunk_deviation_mean_last`, `val_chunk_deviation_p50_last`, `val_chunk_deviation_p90_last`, `val_chunk_deviation_p95_last`, and observed effective bits/token.
+- Observed effective bits/token should increase with target K.
+- Chunk deviation should decrease as target K increases, or any non-monotonicity should identify a useful budget/control failure mode.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp085_modal_dabe_halting_rate_sweep_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_halting_rate_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `5400s` parent function cap |
+| Target soft K values | `12`, `16`, `20` |
+| Child variants | `exp085_halting_target_k12`, `exp085_halting_target_k16`, `exp085_halting_target_k20` |
+| Raw code width | `1024` bits |
+| Lookup candidate list | `Kmax=32` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-ETqfHbthje9amGkus7vXxJ` |
+| Launch contract | `experiments/modal_launches/20260618_141658_exp085_modal_dabe_halting_rate_sweep_001.json` |
+| Early status | parent app active; first child has passed Trainer startup and emitted `[eta] step=200/12000 sps=11.16 eta_min=17.6` |
+
+### Decisions
+- [x] Use new chunk deviation metrics as the primary distortion axis.
+- [x] Keep `Kmax=32` fixed so target-K changes affect halting, not candidate capacity.
+- [x] Launch detached Modal run and capture app ID.
+- [x] Pull lightweight artifacts and produce rate-distortion table.
+
+### Results
+| Metric | target K=12 | target K=16 | target K=20 | Fixed K=32 (EXP-083) |
+|--------|-------------|-------------|-------------|----------------------|
+| observed effective bits/token | `21.52651` | `21.84543` | `22.32022` | `27.0` |
+| mean soft lookup K | `16.07712` | `17.00488` | `18.38610` | `32.0` |
+| mean threshold-active K | `18.72465` | `20.74759` | `22.61288` | `32.0` |
+| keep probability mean | `0.50241` | `0.53140` | `0.57457` | N/A |
+| chunk deviation mean | `5.78534` | `5.74389` | `5.65877` | N/A |
+| chunk deviation rate mean | `0.09040` | `0.08975` | `0.08842` | N/A |
+| chunk deviation p50 | `5.47890` | `5.49593` | `5.24574` | N/A |
+| chunk deviation p90 | `9.76402` | `9.52331` | `9.46928` | N/A |
+| chunk deviation p95 | `11.03138` | `10.87957` | `10.97358` | N/A |
+| chunk deviation max | `14.21021` | `13.34197` | `13.98668` | N/A |
+| token_acc | `0.90960` | `0.91025` | `0.91158` | `0.91882` |
+| token_top5_acc | `0.98712` | `0.98787` | `0.98795` | `0.98791` |
+| token_top10_acc | `0.99193` | `0.99236` | `0.99208` | `0.99220` |
+| exact_16token_block_avg | `0.28257` | `0.28442` | `0.29478` | `0.32180` |
+| exact_64token_chunk_acc | `0.01628` | `0.01480` | `0.01628` | `0.01554` |
+| selector recall@active-K | `0.57983` | `0.64170` | `0.69865` | `0.93540` |
+| selector precision@active-K | `0.99215` | `0.99090` | `0.98992` | `0.93540` |
+| lookup token acc | `0.88553` | `0.88393` | `0.88653` | `0.90822` |
+| non-lookup token acc | `0.91960` | `0.92287` | `0.92531` | `0.92943` |
+
+### Exact Block Accuracy
+| Block | target K=12 | target K=16 | target K=20 | Fixed K=32 (EXP-083) |
+|-------|-------------|-------------|-------------|----------------------|
+| block 0 | `0.40489` | `0.40563` | `0.42413` | `0.44264` |
+| block 1 | `0.24352` | `0.25907` | `0.27461` | `0.31384` |
+| block 2 | `0.25315` | `0.23908` | `0.23686` | `0.26425` |
+| block 3 | `0.22872` | `0.23390` | `0.24352` | `0.26647` |
+
+### Key Observations
+- The rate-distortion direction is correct: target K `12 -> 16 -> 20` yields observed effective bits/token `21.53 -> 21.85 -> 22.32` and chunk deviation mean `5.785 -> 5.744 -> 5.659`.
+- The curve is compressed: target K=12 does not actually produce soft K near 12; it converges to mean soft K `16.08`. The current `lookup_slot_target_weight=0.02` is too weak relative to reconstruction pressure.
+- Even the lowest-rate sweep point is strong: target K=12 reaches token accuracy `0.90960`, very close to target K=16 (`0.91025`) and far above fixed K=16 from EXP-080 (`0.84751`).
+- Increasing target K mostly improves tail/deviation and non-lookup accuracy rather than lookup-token accuracy. Non-lookup token accuracy rises `0.91960 -> 0.92287 -> 0.92531`, suggesting better retained lexical slots improve global repair/refinement.
+- Selector precision remains extremely high across the sweep (`~0.99`), while recall rises with budget (`0.580 -> 0.642 -> 0.699`). This supports the interpretation that halting learns a conservative high-confidence subset of lexical holes.
+- Exact chunk accuracy remains noisy and less informative than chunk deviation: target K=16 has slightly lower exact chunk accuracy than K=12/K=20 despite better average deviation than K=12.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp085_modal_dabe_halting_rate_sweep_001/` |
+| Modal run root | `/experiments/exp085_modal_dabe_halting_rate_sweep_001/` |
+| Pulled files | parent `stage_result.json`, `pipeline_summary.json`; child `stage_result.json`, `config.yaml`, `logs/version_*/metrics.csv` |
+
+### Decisions
+- [x] Use chunk deviation as the rate-distortion y-axis.
+- [x] Treat ranked halting as the lead architecture; the curve is monotonic and much stronger than fixed K=16.
+- [ ] For a wider curve, increase `lookup_slot_target_weight` and/or `lookup_slot_cost_weight` to force true lower-K operating points around soft K `8`, `12`, and `16`.
+- [ ] Consider plotting observed bpt vs chunk deviation mean/p90, with token accuracy as secondary annotation.
+
+### Status: [COMPLETE]
+
+## EXP-084: Ranked Lexical Lookup Slot Halting
+
+**Date:** 2026-06-18
+**Hypothesis:** The failure mode in EXP-081/082 is the coarse chunk-level budget classifier, not adaptive lookup itself. A ranked slot-halting policy over a `Kmax=32` lexical candidate list should learn which individual lookup slots to keep, producing a smoother rate-distortion point near fixed K=16 without hard easy/normal/hard bucket boundaries.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal paired-run overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `lookup_slot_cost_weight=0.02`, `lookup_slot_target_weight=0.02`, `lookup_slot_target_k=16`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` ranked slot-halting decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Runs in the same T4 Modal app as EXP-083.
+- Training remains stable (`nan_batches=0`) if completed.
+- Logs include `lookup_budget_k_mean`, `lookup_active_k_mean`, `lookup_keep_prob_mean`, `observed_effective_bits_per_token`, slot cost/target losses, selector metrics, lookup/non-lookup token accuracy, and exact block metrics.
+- Observed effective bits/token lands near fixed K=16 (`21.5`) while improving over EXP-081 adaptive 8/16/32 or approaching fixed K=16.
+- If it loses to fixed K=16, the result should clarify whether soft slot halting starves copy paths or improves ranked selector quality.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp083_084_modal_dabe_lookup_k32_pair_001` |
+| Variant name | `exp084_ranked_halting_k32` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_lookup_pair` |
+| GPU | one `T4`, sequentially shared with EXP-083 |
+| Timeout | `3600s` parent function cap |
+| Raw code width | `1024` bits |
+| Lookup candidate list | `Kmax=32` |
+| Target active slots | `16` soft slots |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-shUxcp5fyIHiV0wVLfm30z` |
+| Launch contract | `experiments/modal_launches/20260618_065359_exp083_084_modal_dabe_lookup_k32_pair_001.json` |
+| Early status | parent app active; EXP-083 child metrics reached at least step `964`, EXP-084 will run second in the same T4 app |
+
+### Decisions
+- [x] Use differentiable keep probabilities instead of chunk-level easy/normal/hard classification.
+- [x] Run paired with EXP-083 in a single T4 app/container.
+- [x] Launch paired Modal run and capture app ID.
+- [x] Pull lightweight artifacts and compare against fixed K=16/K=32.
+
+### Results
+| Metric | EXP-084 halting Kmax=32 | Fixed K=16 (EXP-080) | Fixed K=32 (EXP-083) | Bucket adaptive 8/16/32 (EXP-081) |
+|--------|--------------------------|----------------------|----------------------|------------------------------------|
+| max effective bits/token | `27.0` | `21.5` | `27.0` | `27.0` |
+| observed effective bits/token | `21.84543` | `21.5` | `27.0` | `21.84197` |
+| mean soft lookup K | `17.00488` | `16.0` | `32.0` | `16.99482` |
+| mean threshold-active K | `20.74759` | `16.0` | `32.0` | N/A |
+| keep probability mean | `0.53140` | N/A | N/A | N/A |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` | `true` / `0` |
+| val loss | `0.39307` | `0.66626` | `0.35712` | `0.83661` |
+| token_acc | `0.91025` | `0.84751` | `0.91882` | `0.82876` |
+| token_top5_acc | `0.98787` | `0.96432` | `0.98791` | `0.95971` |
+| token_top10_acc | `0.99236` | `0.97927` | `0.99220` | `0.97616` |
+| exact_16token_block_avg | `0.28442` | `0.14526` | `0.32180` | `0.10474` |
+| exact_64token_chunk_acc | `0.01480` | `0.00148` | `0.01554` | `0.0` |
+| selector recall@active-K | `0.64170` | `0.85571` | `0.93540` | `0.76441` |
+| selector precision@active-K | `0.99090` | `0.85571` | `0.93540` | `0.82018` |
+| lookup token acc | `0.88393` | `0.83484` | `0.90822` | `0.77201` |
+| non-lookup token acc | `0.92287` | `0.85173` | `0.92943` | `0.84965` |
+
+### Exact Block Accuracy
+| Block | EXP-084 halting Kmax=32 | Fixed K=16 (EXP-080) | Fixed K=32 (EXP-083) | Bucket adaptive 8/16/32 (EXP-081) |
+|-------|--------------------------|----------------------|----------------------|------------------------------------|
+| block 0 | `0.40563` | `0.31310` | `0.44264` | `0.26203` |
+| block 1 | `0.25907` | `0.11177` | `0.31384` | `0.06588` |
+| block 2 | `0.23908` | `0.06958` | `0.26425` | `0.04663` |
+| block 3 | `0.23390` | `0.08660` | `0.26647` | `0.04441` |
+
+### Key Observations
+- Ranked slot halting is the first adaptive-budget result that looks strongly positive: at nearly the same observed bitrate as EXP-081 (`21.845` vs `21.842` bits/token), it improves token accuracy from `0.82876` to `0.91025`.
+- EXP-084 also beats fixed K=16 by a wide margin at only slightly higher observed bitrate (`21.845` vs `21.5` bits/token): token accuracy rises from `0.84751` to `0.91025`, and exact 16-token block accuracy nearly doubles (`0.14526 -> 0.28442`).
+- Fixed K=32 is still the upper envelope (`0.91882` token accuracy, `0.32180` exact-block accuracy), but EXP-084 recovers most of that quality while using a soft mean K of only `17.0`.
+- Halting precision is extremely high (`0.99090`) while recall is low (`0.64170`), indicating the policy is conservative: it usually keeps very good lexical holes, but does not keep all oracle-hard positions. That is a much healthier failure mode than EXP-081/082's coarse budget confusion.
+- Exact full-chunk reconstruction is now nontrivial (`1.48%`) at approximately K=16 bitrate, very close to fixed K=32 (`1.55%`) and 10x fixed K=16 (`0.148%`).
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp083_084_modal_dabe_lookup_k32_pair_001/exp084_ranked_halting_k32/` |
+| Modal run root | `/experiments/exp083_084_modal_dabe_lookup_k32_pair_001/exp084_ranked_halting_k32/` |
+| Pulled files | `stage_result.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Promote ranked lexical slot halting to the lead adaptive-budget architecture.
+- [x] Keep fixed K=32 as the upper-envelope reference.
+- [ ] Run diagnostics on EXP-084 to inspect which holes it keeps and whether low recall misses semantically important positions.
+- [ ] Consider a halting-rate sweep around target K values `12`, `16`, and `20` to draw a rate-distortion curve from the same architectural family.
+
+### Status: [COMPLETE]
+
+## EXP-083: Fixed K=32 Sparse Lookup Upper Envelope
+
+**Date:** 2026-06-18
+**Hypothesis:** Before optimizing adaptive slot allocation, we need the fixed `K=32` upper envelope. If fixed K=32 barely improves over fixed K=16, then slot halting has little headroom; if it improves substantially, then adaptive/ranked allocation has a meaningful target.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal paired-run overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=fixed`, TinyStories `4096/512`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` fixed sparse lookup decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Runs in the same T4 Modal app as EXP-084.
+- Training remains stable (`nan_batches=0`) if completed.
+- Accuracy and exact-block metrics establish whether K=32 improves meaningfully over fixed K=16.
+- Selector recall/precision@32 and lookup/non-lookup token accuracy are logged.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp083_084_modal_dabe_lookup_k32_pair_001` |
+| Variant name | `exp083_fixed_k32` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_lookup_pair` |
+| GPU | one `T4`, sequentially shared with EXP-084 |
+| Timeout | `3600s` parent function cap |
+| Raw code width | `1024` bits |
+| Lookup slots | fixed `K=32` |
+| Effective width | `27.0` bits/token |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-shUxcp5fyIHiV0wVLfm30z` |
+| Launch contract | `experiments/modal_launches/20260618_065359_exp083_084_modal_dabe_lookup_k32_pair_001.json` |
+| Early status | parent app active; child output directory and metrics created, with metrics observed at least through step `964` |
+
+### Decisions
+- [x] Run as the first child variant in the paired T4 function.
+- [x] Launch paired Modal run and capture app ID.
+- [x] Pull lightweight artifacts and compare against fixed K=16.
+
+### Results
+| Metric | EXP-083 fixed K=32 | Fixed K=16 (EXP-080) | Fixed K=8 (EXP-077) |
+|--------|---------------------|----------------------|---------------------|
+| effective bits/token | `27.0` | `21.5` | `18.75` |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` |
+| val loss | `0.35712` | `0.66626` | `1.00656` |
+| token_acc | `0.91882` | `0.84751` | `0.78384` |
+| token_top5_acc | `0.98791` | `0.96432` | `0.92433` |
+| token_top10_acc | `0.99220` | `0.97927` | `0.95066` |
+| exact_16token_block_avg | `0.32180` | `0.14526` | `0.08198` |
+| exact_64token_chunk_acc | `0.01554` | `0.00148` | `0.0` |
+| selector recall/precision@K | `0.93540` | `0.85571` | `0.76351` |
+| lookup token acc | `0.90822` | `0.83484` | `0.75056` |
+| non-lookup token acc | `0.92943` | `0.85173` | `0.78860` |
+
+### Exact Block Accuracy
+| Block | EXP-083 fixed K=32 | Fixed K=16 (EXP-080) | Fixed K=8 (EXP-077) |
+|-------|---------------------|----------------------|---------------------|
+| block 0 | `0.44264` | `0.31310` | `0.24130` |
+| block 1 | `0.31384` | `0.11177` | `0.04293` |
+| block 2 | `0.26425` | `0.06958` | `0.02073` |
+| block 3 | `0.26647` | `0.08660` | `0.02295` |
+
+### Key Observations
+- Fixed K=32 provides substantial headroom over K=16, so the lookup mechanism has not saturated at K=16.
+- Full 64-token exact reconstruction reaches `1.55%`, compared with `0.148%` for K=16 and zero for K=8.
+- Selector recall/precision rises to `0.935`, showing the learned selector can handle a larger ranked candidate list.
+- This run justifies adaptive/ranked allocation: there is meaningful K=32 quality to recover, and EXP-084 recovers most of it at much lower observed bitrate.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp083_084_modal_dabe_lookup_k32_pair_001/exp083_fixed_k32/` |
+| Modal run root | `/experiments/exp083_084_modal_dabe_lookup_k32_pair_001/exp083_fixed_k32/` |
+| Pulled files | `stage_result.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Treat fixed K=32 as the current upper-envelope baseline.
+- [x] Use EXP-083 to contextualize EXP-084's quality recovery at lower observed bitrate.
+- [ ] Run diagnostics only if we need qualitative examples or hole-shape visualizations.
+
+### Status: [COMPLETE]
+
+## EXP-082: Conservative Adaptive Lookup Budget 2/8/16
+
+**Date:** 2026-06-18
+**Hypothesis:** A lower-cost adaptive lookup schedule can preserve most of the learned sparse-lookup benefit by spending `K=2` on easy chunks, `K=8` on normal chunks, and `K=16` on hard chunks. If this approaches EXP-077 or EXP-080 K=16 accuracy at a lower observed effective bitrate, it supports the "sliding attention budget" framing rather than fixed lookup width.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k_schedule=2|8|16`, `lexical_lookup_copy_scale=4.0`, `selector_loss_weight=0.1`, `budget_loss_weight=0.1`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` adaptive learned lookup budget (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Logs include `lookup_budget_k_mean`, `observed_effective_bits_per_token`, `budget_acc`, selector metrics, lookup/non-lookup token accuracy, and exact block metrics.
+- Observed effective bits/token lands below fixed K=16 (`21.5`) and ideally near or below fixed K=8 (`18.75`).
+- Accuracy exceeds the no-lookup 1200-bit baseline and is competitive with fixed K=8.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp082_modal_dabe_hier1024_lookup_adaptive_2_8_16_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Raw code width | `1024` bits |
+| Lookup choices | `K in {2, 8, 16}` |
+| Effective width range | `16.6875` to `21.5` bits/token; observed value logged dynamically |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-Q4AUqBKr1OmhWydoWPU4Rj` |
+| Launch contract | `experiments/modal_launches/20260618_053241_exp082_modal_dabe_hier1024_lookup_adaptive_2_8_16_001.json` |
+| Early status | passed Trainer startup; model has `14.5M` trainable params and emitted `[eta] step=100/12000 sps=11.75 eta_min=16.9` |
+
+### Decisions
+- [x] Use learned chunk-level budget selector supervised by draft-loss hardness buckets.
+- [x] Keep this as the conservative comparator to EXP-081's aggressive schedule.
+- [x] Launch detached Modal run and capture app ID.
+- [x] Pull artifacts and compare against EXP-081, EXP-077 K=8, and EXP-080 K=16.
+
+### Results
+| Metric | EXP-082 adaptive 2/8/16 | Fixed K=8 (EXP-077) | Fixed K=16 (EXP-080) |
+|--------|--------------------------|---------------------|----------------------|
+| max effective bits/token | `21.5` | `18.75` | `21.5` |
+| observed effective bits/token | `18.55357` | `18.75` | `21.5` |
+| mean active lookup K | `7.42857` | `8.0` | `16.0` |
+| budget accuracy | `0.56329` | N/A | N/A |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` |
+| val loss | `1.37973` | `1.00656` | `0.66626` |
+| token_acc | `0.72923` | `0.78384` | `0.84751` |
+| token_top5_acc | `0.89508` | `0.92433` | `0.96432` |
+| token_top10_acc | `0.92870` | `0.95066` | `0.97927` |
+| exact_16token_block_avg | `0.05755` | `0.08198` | `0.14526` |
+| exact_64token_chunk_acc | `0.0` | `0.0` | `0.00148` |
+| selector recall@active-K | `0.59747` | `0.76351` | `0.85571` |
+| selector precision@active-K | `0.68139` | `0.76351` | `0.85571` |
+| lookup token acc | `0.63578` | `0.75056` | `0.83484` |
+| non-lookup token acc | `0.74174` | `0.78860` | `0.85173` |
+
+### Exact Block Accuracy
+| Block | EXP-082 adaptive 2/8/16 | Fixed K=8 (EXP-077) | Fixed K=16 (EXP-080) |
+|-------|--------------------------|---------------------|----------------------|
+| block 0 | `0.20799` | `0.24130` | `0.31310` |
+| block 1 | `0.01554` | `0.04293` | `0.11177` |
+| block 2 | `0.00370` | `0.02073` | `0.06958` |
+| block 3 | `0.00296` | `0.02295` | `0.08660` |
+
+### Key Observations
+- EXP-082 hits the intended bitrate target (`18.55` observed bits/token, slightly below fixed K=8), but reconstruction quality collapses relative to fixed K=8.
+- The learned budget selector only reaches `56.3%` budget accuracy, and selector recall drops to `0.597`, suggesting the model is not reliably matching the right number of lexical holes to chunk hardness.
+- The result still beats the no-lookup 1200-bit baseline on token accuracy (`0.72923` vs `0.71855`) at similar effective bitrate, but the fixed K=8 sparse lookup remains the stronger compression point.
+- Conservative adaptive lookup as implemented is a negative result: budget adaptivity is not enough if it reduces selector stability and starves medium/hard chunks.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp082_modal_dabe_hier1024_lookup_adaptive_2_8_16_001/` |
+| Modal run root | `/experiments/exp082_modal_dabe_hier1024_lookup_adaptive_2_8_16_001/` |
+| Pulled files | `stage_result.json`, `pipeline_summary.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Do not treat 2/8/16 as a replacement for fixed K=8.
+- [ ] If revisiting adaptive budgets, train the budget policy with a differentiable cost/accuracy objective or curriculum rather than batch-rank hardness buckets.
+
+### Status: [COMPLETE]
+
+## EXP-081: Aggressive Adaptive Lookup Budget 8/16/32
+
+**Date:** 2026-06-18
+**Hypothesis:** The next architectural step is not a sliding token window but a sliding attention/lookup budget: easy chunks receive `K=8`, normal chunks receive `K=16`, and hard chunks receive `K=32`. This should improve exact local reconstruction and token accuracy over fixed K=8/K=16 while avoiding the cost of always using K=32.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k_schedule=8|16|32`, `lexical_lookup_copy_scale=4.0`, `selector_loss_weight=0.1`, `budget_loss_weight=0.1`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` adaptive learned lookup budget (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Logs include `lookup_budget_k_mean`, `observed_effective_bits_per_token`, `budget_acc`, selector metrics, lookup/non-lookup token accuracy, and exact block metrics.
+- Observed effective bits/token is meaningfully below the fixed K=32 ceiling (`27.0` bits/token).
+- Accuracy and exact-block reconstruction improve over fixed K=16 enough to justify the larger adaptive ceiling.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp081_modal_dabe_hier1024_lookup_adaptive_8_16_32_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Raw code width | `1024` bits |
+| Lookup choices | `K in {8, 16, 32}` |
+| Effective width range | `18.75` to `27.0` bits/token; observed value logged dynamically |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-hDtEwuR5ZIu0XlyisQ5Z3L` |
+| Launch contract | `experiments/modal_launches/20260618_053241_exp081_modal_dabe_hier1024_lookup_adaptive_8_16_32_001.json` |
+| Early status | passed Trainer startup; model has `14.5M` trainable params and emitted `[eta] step=100/12000 sps=11.53 eta_min=17.2` |
+
+### Decisions
+- [x] Use `easy=8` rather than `easy=4` to avoid starving easy chunks too aggressively.
+- [x] Train a learned budget selector instead of using oracle budget selection at decode.
+- [x] Launch detached Modal run and capture app ID.
+- [x] Pull artifacts and compare against fixed K=8/K=16 plus EXP-082.
+
+### Results
+| Metric | EXP-081 adaptive 8/16/32 | Fixed K=8 (EXP-077) | Fixed K=16 (EXP-080) |
+|--------|--------------------------|---------------------|----------------------|
+| max effective bits/token | `27.0` | `18.75` | `21.5` |
+| observed effective bits/token | `21.84197` | `18.75` | `21.5` |
+| mean active lookup K | `16.99482` | `8.0` | `16.0` |
+| budget accuracy | `0.63509` | N/A | N/A |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` |
+| val loss | `0.83661` | `1.00656` | `0.66626` |
+| token_acc | `0.82876` | `0.78384` | `0.84751` |
+| token_top5_acc | `0.95971` | `0.92433` | `0.96432` |
+| token_top10_acc | `0.97616` | `0.95066` | `0.97927` |
+| exact_16token_block_avg | `0.10474` | `0.08198` | `0.14526` |
+| exact_64token_chunk_acc | `0.0` | `0.0` | `0.00148` |
+| selector recall@active-K | `0.76441` | `0.76351` | `0.85571` |
+| selector precision@active-K | `0.82018` | `0.76351` | `0.85571` |
+| lookup token acc | `0.77201` | `0.75056` | `0.83484` |
+| non-lookup token acc | `0.84965` | `0.78860` | `0.85173` |
+
+### Exact Block Accuracy
+| Block | EXP-081 adaptive 8/16/32 | Fixed K=8 (EXP-077) | Fixed K=16 (EXP-080) |
+|-------|--------------------------|---------------------|----------------------|
+| block 0 | `0.26203` | `0.24130` | `0.31310` |
+| block 1 | `0.06588` | `0.04293` | `0.11177` |
+| block 2 | `0.04663` | `0.02073` | `0.06958` |
+| block 3 | `0.04441` | `0.02295` | `0.08660` |
+
+### Key Observations
+- EXP-081 improves strongly over fixed K=8 (`0.82876` vs `0.78384` token accuracy), but it does not beat fixed K=16 (`0.84751`) despite spending slightly more observed effective bitrate (`21.84` vs `21.5`).
+- Mean active K is `16.99`, so the learned policy effectively behaves like a slightly-more-expensive K=16 variant, not an efficient adaptive curve.
+- Budget accuracy is only `63.5%`; the budget selector has learned some hardness signal, but not enough to dominate the fixed-budget baseline.
+- Selector precision improves relative to fixed K=8 (`0.82018` vs `0.76351`), but recall remains K=8-like rather than K=16-like. This suggests budget selection and position selection are interfering: when the active budget changes per chunk, the selector does not consistently cover the highest-loss holes.
+- Aggressive adaptive lookup is useful as a negative/diagnostic result: variable attention budget is plausible, but naive batch-rank hardness supervision is not the paper result yet.
+
+### Artifacts
+| Artifact | Value |
+|----------|-------|
+| Local download | `experiments/modal_downloads/exp081_modal_dabe_hier1024_lookup_adaptive_8_16_32_001/` |
+| Modal run root | `/experiments/exp081_modal_dabe_hier1024_lookup_adaptive_8_16_32_001/` |
+| Pulled files | `stage_result.json`, `pipeline_summary.json`, `config.yaml`, `logs/version_0/metrics.csv` |
+
+### Decisions
+- [x] Do not replace fixed K=16 with the current adaptive 8/16/32 schedule.
+- [x] Keep the adaptive-budget framing as a research direction, but treat this implementation as a negative result.
+- [ ] Prefer fixed K=8/K=16 for the current main table unless a better budget objective is added.
+
+### Status: [COMPLETE]
+
+## EXP-080: Learned Sparse Lookup K-Ablation
+
+**Date:** 2026-06-18
+**Hypothesis:** Learned sparse lexical lookup has a quality-throughput tradeoff controlled by `K`. A smaller `K=4` may retain most of EXP-077's gain with lower side-budget, while `K=16` may improve exact local reconstruction enough to justify the extra lookup overhead.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k in {4,16}`, `lexical_lookup_copy_scale=4.0`, `selector_loss_weight=0.1`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` learned lookup selector (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Both detached Modal runs complete or checkpoint within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Effective bitrate is logged for each K.
+- K=4 retains a substantial fraction of EXP-077's token/exact-block gain over no-lookup EXP-074.
+- K=16 improves exact block accuracy over K=8 enough to justify its `22.0` bits/token effective budget.
+- Selector recall/precision@K is logged for both K values.
+
+### Decisions
+- [x] Reuse EXP-077 as the K=8 learned-selector point.
+- [x] Launch K=4 detached Modal run.
+- [x] Launch K=16 detached Modal run.
+- [x] Pull artifacts and build the K=4/K=8/K=16 tradeoff table.
+
+### Planned Launches
+| Field | K=4 | K=16 |
+|------|-----|------|
+| Run ID | `exp080_modal_dabe_hier1024_lookup_learned_k4_001` | `exp080_modal_dabe_hier1024_lookup_learned_k16_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` | same |
+| GPU | one `T4` | one `T4` |
+| Timeout | `1800s` | `1800s` |
+| Raw code width | `1024` bits | `1024` bits |
+| Lookup side bits | `88` bits/chunk | `352` bits/chunk |
+| Effective width | `1112` bits/chunk (`17.375` bits/token) | `1376` bits/chunk (`21.5` bits/token) |
+
+### Launch Details
+| Field | K=4 | K=16 |
+|------|-----|------|
+| Modal profile | `qrk-labs` | `qrk-labs` |
+| App ID | `ap-kNEcgtFBegpTJytaPlBqYe` | `ap-EacsDuHrIB82U8DwfSAPII` |
+| Launch contract | `experiments/modal_launches/20260617_232942_exp080_modal_dabe_hier1024_lookup_learned_k4_001.json` | `experiments/modal_launches/20260617_232942_exp080_modal_dabe_hier1024_lookup_learned_k16_001.json` |
+| Early status | passed Trainer startup; model has `14.5M` trainable params and `205` train-mode modules | Modal app/function creation succeeded |
+
+### Results
+| Metric | K=4 | K=8 (EXP-077) | K=16 |
+|--------|-----|---------------|------|
+| effective bits/token | `17.375` | `18.75` | `21.5` |
+| lookup side bits/chunk | `88` | `176` | `352` |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` |
+| token_acc | `0.76220` | `0.78384` | `0.84751` |
+| token_top5_acc | `0.89928` | `0.92433` | `0.96432` |
+| token_top10_acc | `0.92855` | `0.95066` | `0.97927` |
+| exact_16token_block_avg | `0.06810` | `0.08198` | `0.14526` |
+| exact_64token_chunk_acc | `0.0` | `0.0` | `0.00148` |
+| selector recall/precision@K | `0.60622` | `0.76351` | `0.85571` |
+| lookup token acc | `0.70633` | `0.75056` | `0.83484` |
+| non-lookup token acc | `0.76593` | `0.78860` | `0.85173` |
+| bit density | `0.48941` | `0.49443` | `0.49309` |
+
+### Exact Block Accuracy
+| Block | K=4 | K=8 (EXP-077) | K=16 |
+|-------|-----|---------------|------|
+| block 0 | `0.21688` | `0.24130` | `0.31310` |
+| block 1 | `0.02739` | `0.04293` | `0.11177` |
+| block 2 | `0.01850` | `0.02073` | `0.06958` |
+| block 3 | `0.00962` | `0.02295` | `0.08660` |
+
+### Key Observations
+- The K curve is monotonic and meaningful: larger lookup budgets improve token accuracy, top-k accuracy, selector recall, and exact local reconstruction.
+- K=4 already beats the 1200-bit no-lookup baseline while using fewer effective bits (`17.375` vs `18.75` bits/token), supporting the architectural value of targeted lexical memory.
+- K=16 is the first run with nonzero exact 64-token chunk accuracy (`0.148%`) and pushes exact 16-token block reconstruction to `14.5%`.
+- Selector quality scales with K (`0.606 -> 0.764 -> 0.856`), suggesting the selector learns hole shape more easily when it has more slots.
+- K=16 has a much larger side budget (`21.5` bits/token), so K=4/K=8 remain the cleaner compression points while K=16 is the best reconstruction point.
+
+### Artifacts
+| Artifact | K=4 | K=16 |
+|----------|-----|------|
+| Local download | `experiments/modal_downloads/exp080_modal_dabe_hier1024_lookup_learned_k4_001/` | `experiments/modal_downloads/exp080_modal_dabe_hier1024_lookup_learned_k16_001/` |
+| Modal run root | `/experiments/exp080_modal_dabe_hier1024_lookup_learned_k4_001/` | `/experiments/exp080_modal_dabe_hier1024_lookup_learned_k16_001/` |
+| Best checkpoint | `checkpoints/best-step-0012000.ckpt` | `checkpoints/best-step-0012000.ckpt` |
+
+### Decisions
+- [x] Treat sparse lookup as a tunable bitrate-quality mechanism.
+- [x] Use K=4 as the efficient point, K=8 as the balanced point, and K=16 as the reconstruction-quality point.
+- [ ] Run diagnostics on K=16 if the next goal is understanding how full-chunk exact first becomes nonzero.
+- [ ] Consider adaptive K so easy chunks spend fewer side bits and hard chunks spend more.
+
+### Status: [COMPLETE]
+
+## EXP-079: Fair 1200-bit Hierarchical No-Lookup Baseline
+
+**Date:** 2026-06-18
+**Hypothesis:** If EXP-077's gains come mostly from extra bitrate, then a `1200`-bit hierarchical-local no-lookup baseline should approach learned sparse lookup performance at the same effective `18.75` bits/token. If sparse lookup remains better, then separating semantic shape bits from lexical exception memory is an architectural win.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1200`, `hierarchical_block_tokens=16`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` hierarchical-local decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Effective bits/token equals EXP-077 (`18.75`) without lookup side memory.
+- Compare token/top-k/exact-block accuracy directly against EXP-077.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Launch detached Modal run and capture app ID + launch details.
+- [x] Pull artifacts and compare against EXP-077.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp079_modal_dabe_hier1200_no_lookup_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_local` |
+| Code width | `1200` bits (`18.75` bits/token) |
+| Local structure | `4` blocks x `16` tokens; `300` bits/block |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-j3cvnyp0W51WnKLt7wXer1` |
+| Launch contract | `experiments/modal_launches/20260617_232942_exp079_modal_dabe_hier1200_no_lookup_001.json` |
+| Early status | Modal app/function creation succeeded and seed initialized |
+
+### Results
+| Metric | EXP-079 Value | EXP-077 Learned Lookup | Delta |
+|--------|---------------|------------------------|-------|
+| run state | complete; `nan_batches=0`, `stable=true` | complete | pass |
+| effective bits/token | `18.75` | `18.75` | matched |
+| lookup side bits/chunk | `0` | `176` | baseline has no side memory |
+| token_acc | `0.71855` | `0.78384` | lookup `+0.06529` |
+| token_top5_acc | `0.85374` | `0.92433` | lookup `+0.07058` |
+| token_top10_acc | `0.88861` | `0.95066` | lookup `+0.06205` |
+| exact_16token_block_avg | `0.05459` | `0.08198` | lookup `+0.02739` |
+| exact_64token_chunk_acc | `0.0` | `0.0` | no change |
+| bit_density | `0.49066` | `0.49443` | both non-collapsed |
+
+### Exact Block Accuracy
+| Block | EXP-079 1200-bit No Lookup | EXP-077 Learned Lookup |
+|-------|-----------------------------|------------------------|
+| block 0 | `0.19393` | `0.24130` |
+| block 1 | `0.00962` | `0.04293` |
+| block 2 | `0.00740` | `0.02073` |
+| block 3 | `0.00740` | `0.02295` |
+
+### Key Observations
+- Increasing the continuous hierarchical code from `1024` to `1200` bits does not reproduce the lookup gain.
+- EXP-079 is roughly at the old no-lookup diagnostic level (`~0.718` token accuracy, `~0.054` exact-block average), despite matching EXP-077's effective bitrate.
+- This is strong evidence that sparse lexical exception memory is an architectural improvement, not merely extra bitrate.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp079_modal_dabe_hier1200_no_lookup_001/` |
+| Modal run root | `/experiments/exp079_modal_dabe_hier1200_no_lookup_001/` on `dabe-experiments` |
+| Best checkpoint | `/experiments/exp079_modal_dabe_hier1200_no_lookup_001/checkpoints/best-step-0012000.ckpt` |
+
+### Decisions
+- [x] Reject "just add equivalent continuous bits" as the explanation for EXP-077's gain.
+- [ ] Use EXP-079 as the fair bitrate baseline in paper tables.
+
+### Status: [COMPLETE]
+
+## EXP-078: Decode Diagnostics for Learned Sparse Lookup
+
+**Date:** 2026-06-18
+**Hypothesis:** Direct diagnostics on EXP-077's best checkpoint will show whether learned sparse lookup improves exact local reconstruction by selecting lexical exception positions such as names, rare tokens, punctuation, or high-entropy details, rather than only improving aggregate token metrics.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp077_modal_dabe_hier1024_lookup_learned_selector_001`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_k=8`, `lexical_lookup_selector=learned`, TinyStories `4096/512`, T4, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates EXP-077's saved best checkpoint directly.
+- Full validation-set token/top-k/exact metrics are recomputed outside Trainer callback state.
+- Exact 16-token block and 32-token half metrics are reported.
+- Per-position accuracy, selected lookup positions, selector recall/precision, and decoded samples are saved.
+- Results clarify what the learned selector stores and how lookup changes qualitative failures.
+
+### Decisions
+- [x] Launch detached Modal diagnostic probe and capture app ID + launch details.
+- [x] Pull diagnostics JSON and compare against EXP-074/076/077.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp078_modal_dabe_lookup_learned_decode_diag_001` |
+| Source run | `exp077_modal_dabe_hier1024_lookup_learned_selector_001` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-UylGN82hhxW4UdbQD1zUEs` |
+| Launch contract | `experiments/modal_launches/20260617_232742_exp078_modal_dabe_lookup_learned_decode_diag_001.json` |
+| Run state | completed cleanly |
+
+### Results
+| Metric | EXP-078 Diagnostic Value | Reference |
+|--------|--------------------------|-----------|
+| checkpoint | EXP-077 `best-step-0012000.ckpt` | matched source |
+| batches / val chunks | `43` / `1351` | full validation chunks |
+| token_ce | `0.95468` | EXP-077 callback loss `1.00656` |
+| token_acc | `0.78478` | EXP-077 callback `0.78384` |
+| token_top5_acc | `0.92407` | EXP-077 callback `0.92433` |
+| token_top10_acc | `0.95112` | EXP-077 callback `0.95066` |
+| exact_16token_block_acc | `0.08716` | EXP-077 callback avg `0.08198` |
+| exact_32token_half_acc | `0.01369` | first nontrivial half-chunk exact signal |
+| exact_64token_chunk_acc | `0.0` | unchanged |
+| bit_density | `0.48738` | non-collapsed |
+| lookup_token_acc | `0.75657` | selected positions |
+| non_lookup_token_acc | `0.78881` | non-selected positions |
+| lookup_gate_mean | `0.82981` | active but less aggressive than oracle |
+| selector_recall/precision@8 | `0.76342` / `0.76342` | far above random `0.125` |
+| per_block_exact_acc | `[0.24796, 0.04293, 0.02813, 0.02961]` | strongest local exact profile so far |
+| per_half_exact_acc | `[0.02665, 0.00074]` | full chunk still not exact |
+
+### Key Observations
+- Diagnostics confirm EXP-077's improvement is real outside Trainer callback state.
+- Exact 16-token block accuracy reaches `8.7%`, and exact 32-token half-chunk accuracy reaches `1.37%`, the clearest evidence so far of composable local exact reconstruction.
+- Lookup positions in samples include early names/details and mid-span lexical exceptions, but decoded samples still show entity substitution and repeated copied tokens. The memory repairs many hard tokens but can also over-inject lookup vocabulary.
+- The first half remains much easier than the second half, but the second-half exact signal is no longer strictly zero.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp078_modal_dabe_lookup_learned_decode_diag_001/` |
+| Modal run root | `/experiments/exp078_modal_dabe_lookup_learned_decode_diag_001/` on `dabe-experiments` |
+| Diagnostics JSON | `experiments/modal_downloads/exp078_modal_dabe_lookup_learned_decode_diag_001/decode_diagnostics.json` |
+
+### Decisions
+- [x] Treat EXP-077 diagnostics as confirmation that learned sparse lookup improves exact local reconstruction.
+- [ ] Use selected lookup positions from EXP-078 samples to design selector regularization for less over-copying.
+- [ ] Continue fair bitrate baseline and K-ablation before making the architectural claim final.
+
+### Status: [COMPLETE]
+
+## EXP-077: Hierarchical 1024 Sparse Lookup with Learned Selector
+
+**Date:** 2026-06-17
+**Hypothesis:** EXP-076 showed that sparse lexical memory repairs exact-token holes when an oracle draft-loss selector chooses positions. A learned encoder-side selector trained to predict those oracle holes should retain much of the lookup benefit while removing the non-deployable draft-loss selection step.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_k=8`, `lexical_lookup_selector=learned`, `lexical_lookup_copy_scale=4.0`, `selector_loss_weight=0.1`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` learned lookup selector (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Effective budget remains `1200` bits/chunk (`18.75` bits/token), matching EXP-076.
+- Selector recall/precision@K against the oracle draft-loss holes is logged and improves during training.
+- Token accuracy and exact block accuracy beat EXP-075 local refinement.
+- Learned selector retains at least half of EXP-076's exact-block gain over EXP-074.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Keep EXP-076's oracle selector available as `lexical_lookup_selector=oracle_loss`.
+- [x] Add `lexical_lookup_selector=learned`, using encoder-side token/position features to select lookup positions.
+- [x] Train the selector with an auxiliary BCE loss against the current draft-loss top-k mask.
+- [x] During training and validation, use the learned selector's own top-k positions for lookup, not the oracle positions.
+- [x] Launch detached Modal run and capture app ID + launch details.
+- [x] Pull artifacts and compare against EXP-074/076.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp077_modal_dabe_hier1024_lookup_learned_selector_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_lookup` |
+| Selector | `learned` encoder-side top-k selector |
+| Raw code width | `1024` bits (`16.0` bits/token) |
+| Lookup | `K=8` token-position entries (`176` bits/chunk) |
+| Effective width | `1200` bits/chunk (`18.75` bits/token) |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-1GfY85gzinwP7DEsEqrpWr` |
+| Launch contract | `experiments/modal_launches/20260617_230315_exp077_modal_dabe_hier1024_lookup_learned_selector_001.json` |
+| Early status | passed dataset load and Trainer startup; model has `14.5M` trainable params and `205` train-mode modules |
+
+### Results
+| Metric | EXP-077 Value | Reference | Delta |
+|--------|---------------|-----------|-------|
+| run state | complete; `nan_batches=0`, `stable=true` | required stable | pass |
+| raw code bits/token | `16.0` | EXP-076 `16.0` | same DABE code |
+| lookup side bits/chunk | `176` | EXP-076 `176` | matched |
+| effective bits/token | `18.75` | EXP-076 `18.75` | matched |
+| selector recall/precision@8 | `0.76351` / `0.76351` | random approx `0.125`; oracle `1.0` | learned useful hole shape |
+| `val_token_acc_last` | `0.78384` | EXP-076 oracle `0.76560`; EXP-074 no-lookup `0.72199` | new best |
+| `val_token_top5_acc_last` | `0.92433` | EXP-076 oracle `0.92303`; EXP-074 `0.85761` | new best / parity with oracle |
+| `val_token_top10_acc_last` | `0.95066` | EXP-076 oracle `0.95487`; EXP-074 `0.89111` | slight below oracle, far above no-lookup |
+| `val_exact_chunk_acc_last` | `0.0` | prior `0.0` | no full-chunk exact yet |
+| exact 16-token block avg | `0.08198` | EXP-076 oracle `0.07939`; EXP-074 `0.05218` | new best |
+| lookup-selected token acc | `0.75056` | EXP-076 oracle `0.63444` | learned selector chooses more recoverable holes |
+| non-lookup token acc | `0.78860` | EXP-076 oracle `0.78434` | slight better |
+| lookup gate mean | `0.83230` | EXP-076 oracle `0.88662` | less aggressive copy gate |
+| bit density | `0.49443` | non-collapsed target | pass |
+
+### Position / Block Accuracy
+| Span | EXP-077 Token Acc | EXP-076 Oracle | EXP-074 No Lookup |
+|------|-------------------|----------------|-------------------|
+| block 0 (`00-15`) | `0.82730` | `0.81292` | `0.77433` |
+| block 1 (`16-31`) | `0.77600` | `0.75514` | `0.71373` |
+| block 2 (`32-47`) | `0.76615` | `0.74412` | `0.70179` |
+| block 3 (`48-63`) | `0.76591` | `0.75023` | `0.69809` |
+| second half (`32-63`) | `0.76603` | `0.74718` | `0.69994` |
+
+### Exact Block Accuracy
+| Block | EXP-077 | EXP-076 Oracle | EXP-074 No Lookup |
+|-------|---------|----------------|-------------------|
+| block 0 | `0.24130` | `0.23316` | `0.19097` |
+| block 1 | `0.04293` | `0.03035` | `0.00888` |
+| block 2 | `0.02073` | `0.02813` | `0.00444` |
+| block 3 | `0.02295` | `0.02591` | `0.00444` |
+
+### Key Observations
+- The learned selector is deployable in the intended sense: it chooses lookup positions from encoder-side token/position features and does not use oracle positions for lookup.
+- Selector recall/precision@8 reaches `0.7635`, far above random selection and high enough to recover the oracle lookup benefit.
+- Surprisingly, learned selection beats oracle draft-loss selection on final token accuracy and slightly beats it on aggregate exact-block accuracy. Likely explanation: oracle draft-loss positions are the hardest positions, while the learned selector finds a more recoverable hard-token subset that works better with the copy gate.
+- Lookup-selected token accuracy is much higher than EXP-076 (`0.7506` vs `0.6344`), and the lookup/non-lookup gap is small (`0.038`), indicating the learned selector chooses holes that the lookup mechanism can actually repair.
+- Full-chunk exact remains zero; exact local reconstruction improves but is still mostly a local-span phenomenon.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp077_modal_dabe_hier1024_lookup_learned_selector_001/` |
+| Modal run root | `/experiments/exp077_modal_dabe_hier1024_lookup_learned_selector_001/` on `dabe-experiments` |
+| Best checkpoint | `/experiments/exp077_modal_dabe_hier1024_lookup_learned_selector_001/checkpoints/best-step-0012000.ckpt` |
+| Last checkpoint | `/experiments/exp077_modal_dabe_hier1024_lookup_learned_selector_001/checkpoints/last.ckpt` |
+
+### Decisions
+- [x] Treat learned sparse lexical lookup as the new leading architecture.
+- [ ] Run decode diagnostics on EXP-077 to inspect selected lookup positions and qualitative samples.
+- [ ] Run K-ablation next (`K=4`, `K=8`, `K=16`) with learned selector to map compression-quality tradeoff.
+- [ ] Consider selector regularizers/curricula that favor exact-span coverage rather than only draft-loss imitation.
+
+### Status: [COMPLETE]
+
+## EXP-076: Hierarchical 1024 with Sparse Lexical Lookup
+
+**Date:** 2026-06-17
+**Hypothesis:** Exact reconstruction is bottlenecked by high-entropy lexical identity rather than semantic shape alone. A sparse side lookup containing `K=8` hard token IDs plus positions should let the 1024-bit hierarchical DABE code carry the chunk shape while the lookup memory repairs exact names/details/punctuation, improving exact 16-token block reconstruction.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_k=8`, `lexical_lookup_copy_scale=4.0`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` sparse lexical lookup decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Effective budget is logged separately from raw DABE code bits.
+- Overall token accuracy beats EXP-074 diagnostic (`>0.72199`) despite the lookup side budget.
+- Exact 16-token block accuracy improves over EXP-072/074 (`>0.05403`).
+- Lookup-selected token accuracy exceeds non-lookup token accuracy, showing that the memory is actually repairing hard positions.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Keep the main DABE code at `1024` bits and `4 x 16-token` blocks.
+- [x] Add explicit side-channel accounting: GPT-2 token ID bits (`16`) + position bits (`6`) per lookup entry.
+- [x] Use `K=8`, adding `176` lookup bits per chunk, for `1200` effective bits/chunk or `18.75` effective bits/token.
+- [x] Use draft-loss top-k positions as the first oracle-style selector to test whether sparse literal memory addresses the failure mode.
+- [x] Launch detached Modal run and capture app ID + launch details.
+- [x] Pull artifacts and compare against EXP-071/074/075.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp076_modal_dabe_hier1024_sparse_lookup_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_lookup` |
+| Raw code width | `1024` bits (`16.0` bits/token) |
+| Lookup | `K=8` token-position entries (`176` bits/chunk) |
+| Effective width | `1200` bits/chunk (`18.75` bits/token) |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-oIPDl5FXz8xr3tT5FhPE7a` |
+| Launch contract | `experiments/modal_launches/20260617_223942_exp076_modal_dabe_hier1024_sparse_lookup_001.json` |
+| Early status | initial HF dataset read timeout retried automatically; passed dataset load and Trainer startup; model has `14.5M` trainable params and `199` train-mode modules |
+| Early ETA evidence | `[eta] step=100/12000 sps=11.90 eta_min=16.7`; `[eta] step=500/12000 sps=12.51 eta_min=15.3` |
+
+### Results
+| Metric | EXP-076 Value | Reference | Delta |
+|--------|---------------|-----------|-------|
+| run state | complete; `nan_batches=0`, `stable=true` | required stable | pass |
+| raw code bits/token | `16.0` | EXP-071/074/075 `16.0` | same DABE code |
+| lookup side bits/chunk | `176` | none | explicit side budget |
+| effective bits/token | `18.75` | EXP-071/074/075 `16.0` | `+17.2%` effective bits |
+| `val_token_acc_last` | `0.76560` | EXP-071 final `0.72404`; EXP-074 diagnostic `0.72199`; EXP-075 final `0.70058` | new best |
+| `val_token_top5_acc_last` | `0.92303` | EXP-071 `0.85799`; EXP-074 `0.85761`; EXP-075 `0.83997` | new best |
+| `val_token_top10_acc_last` | `0.95487` | EXP-071 `0.89222`; EXP-074 `0.89111`; EXP-075 `0.87558` | new best |
+| `val_exact_chunk_acc_last` | `0.0` | prior `0.0` | no full-chunk exact yet |
+| exact 16-token block avg | `0.07939` | EXP-072 `0.05403`; EXP-074 `0.05218` | `+47%` vs EXP-072 |
+| `val_bit_density_last` | `0.49226` | non-collapsed target | pass |
+| lookup-selected token acc | `0.63444` | selected hard positions | repaired but still hard |
+| non-lookup token acc | `0.78434` | normal positions | expected higher |
+| lookup gate mean | `0.88662` | N/A | active copy path |
+
+### Position / Block Accuracy
+| Span | EXP-076 Token Acc | EXP-074 Token Acc | Delta |
+|------|-------------------|-------------------|-------|
+| block 0 (`00-15`) | `0.81292` | `0.77433` | `+0.03858` |
+| block 1 (`16-31`) | `0.75514` | `0.71373` | `+0.04140` |
+| block 2 (`32-47`) | `0.74412` | `0.70179` | `+0.04233` |
+| block 3 (`48-63`) | `0.75023` | `0.69809` | `+0.05214` |
+| second half (`32-63`) | `0.74718` | `0.69994` | `+0.04723` |
+
+### Exact Block Accuracy
+| Block | EXP-076 | EXP-074 | Delta |
+|-------|---------|---------|-------|
+| block 0 | `0.23316` | `0.19097` | `+0.04219` |
+| block 1 | `0.03035` | `0.00888` | `+0.02147` |
+| block 2 | `0.02813` | `0.00444` | `+0.02369` |
+| block 3 | `0.02591` | `0.00444` | `+0.02147` |
+
+### Key Observations
+- Sparse lexical lookup is the first architectural change that clearly improves both token accuracy and exact local-block reconstruction.
+- The improvement is broad across blocks, not only in block 0. Blocks 1-3 exact accuracy rise from near-zero to roughly `2.6-3.0%`.
+- Top-k metrics jump sharply (`top10=0.95487`), supporting the hypothesis that the semantic code plus lookup memory gets the right lexical token into the local candidate set.
+- Lookup-selected tokens remain harder than non-lookup tokens (`0.634` vs `0.784`) because the selector targets draft-loss top-k holes, but the selected-token accuracy rises substantially during training, indicating the copy path is active.
+- The result must be reported with effective bitrate (`18.75` bits/token), not raw code bitrate (`16.0` bits/token).
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp076_modal_dabe_hier1024_sparse_lookup_001/` |
+| Modal run root | `/experiments/exp076_modal_dabe_hier1024_sparse_lookup_001/` on `dabe-experiments` |
+| Best checkpoint | `/experiments/exp076_modal_dabe_hier1024_sparse_lookup_001/checkpoints/best-step-0012000.ckpt` |
+| Last checkpoint | `/experiments/exp076_modal_dabe_hier1024_sparse_lookup_001/checkpoints/last.ckpt` |
+
+### Decisions
+- [x] Treat sparse lexical lookup as the leading architectural direction.
+- [ ] Run decode diagnostics on EXP-076 to inspect per-position gains and samples.
+- [ ] Next ablate lookup size (`K=4`, `K=8`, `K=16`) and/or selector type to measure quality-vs-throughput tradeoff.
+- [ ] Replace oracle draft-loss top-k selection with a learned or encoder-side selector before claiming deployable compression.
+
+### Status: [COMPLETE]
+
+## EXP-075: Hierarchical 1024 with Local Causal Refinement
+
+**Date:** 2026-06-17
+**Hypothesis:** The remaining exact-reconstruction failure is decoder-limited rather than primarily code-capacity-limited. Adding a code-only causal local refinement pass inside each 16-token hierarchical block should improve local consistency and exact block recovery while preserving the 64-token / 1024-bit throughput story.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_local_refine`, `code_bits=1024`, `hierarchical_block_tokens=16`, `hierarchical_local_refine_layers=1`, `hierarchical_local_refine_causal=true`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` local refinement decoder mode (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Overall token accuracy remains competitive with EXP-071/074 (`>=0.72` diagnostic or callback-level target).
+- Exact 16-token block accuracy improves over EXP-072/074 (`>0.05403`).
+- Second-half and block 1-3 token accuracy do not regress versus EXP-074.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Preserve `4 x 16-token` hierarchical blocks; do not reduce block width.
+- [x] Add local refinement as code-only decoding rather than teacher-forced target-token conditioning.
+- [x] Use a causal local mask to bias refinement toward sequential consistency within each 16-token block.
+- [x] Launch detached Modal run and capture app ID + launch details.
+- [x] Pull artifacts and compare against EXP-071/074.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp075_modal_dabe_hier1024_local_refine_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_local_refine` |
+| Code width | `1024` bits (`16.0` bits/token) |
+| Local structure | `4` blocks x `16` tokens; `256` bits/block |
+| Local refinement | `1` causal TransformerEncoder layer per block, residual-normalized |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-4cXwyGAoWjqZQ8ytaHG71v` |
+| Launch contract | `experiments/modal_launches/20260617_214442_exp075_modal_dabe_hier1024_local_refine_001.json` |
+| Early status | passed dataset load and Trainer startup; model has `14.4M` trainable params and `193` train-mode modules |
+| Early ETA evidence | `[eta] step=100/12000 sps=17.25 eta_min=11.5`; `[eta] step=400/12000 sps=17.73 eta_min=10.9` |
+
+### Results
+| Metric | EXP-075 Value | Reference | Delta |
+|--------|---------------|-----------|-------|
+| run state | complete; `nan_batches=0`, `stable=true` | required stable | pass |
+| decoder mode | `hierarchical_local_refine` | EXP-071/074 `hierarchical_local` | structural change |
+| `val_token_acc_last` | `0.70058` | EXP-071 final `0.72404`; EXP-074 diagnostic `0.72199` | `-0.02346` vs EXP-071; `-0.02141` vs EXP-074 |
+| `val_token_top5_acc_last` | `0.83997` | EXP-071 final `0.85799`; EXP-074 diagnostic `0.85761` | worse |
+| `val_token_top10_acc_last` | `0.87558` | EXP-071 final `0.89222`; EXP-074 diagnostic `0.89111` | worse |
+| `val_exact_chunk_acc_last` | `0.0` | EXP-071/074 `0.0` | no change |
+| `val_bit_density_last` | `0.49204` | non-collapsed target | pass |
+| Block token acc `[0,1,2,3]` | `[0.76096, 0.69361, 0.67529, 0.67246]` | EXP-074 diagnostic `[0.77433, 0.71373, 0.70179, 0.69809]` | all blocks worse |
+| Block exact acc `[0,1,2,3]` | `[0.19319, 0.00444, 0.00888, 0.00074]` | EXP-074 diagnostic `[0.19097, 0.00888, 0.00444, 0.00444]` | mixed; no aggregate win |
+
+### Key Observations
+- Local causal residual refinement trained stably and stayed within the T4 cap, but it underperformed the simpler hierarchical-local decoder on token/top-k metrics.
+- The refinement pass did not improve exact local reconstruction overall. Block 2 exact improved relative to EXP-074, but blocks 1 and 3 regressed.
+- The likely failure mode is that a causal mask over code-derived hidden states removes useful bidirectional local evidence without adding true autoregressive generated-token conditioning.
+- This result narrows the path: code-only causal refinement is not enough. If we want local refinement, it likely needs an iterative/token-conditioning mechanism or a denoising/mask-predict objective rather than a single causal hidden-state pass.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp075_modal_dabe_hier1024_local_refine_001/` |
+| Modal run root | `/experiments/exp075_modal_dabe_hier1024_local_refine_001/` on `dabe-experiments` |
+| Best checkpoint | `/experiments/exp075_modal_dabe_hier1024_local_refine_001/checkpoints/best-step-0012000.ckpt` |
+| Last checkpoint | `/experiments/exp075_modal_dabe_hier1024_local_refine_001/checkpoints/last.ckpt` |
+
+### Decisions
+- [x] Do not promote `hierarchical_local_refine` as the main decoder.
+- [ ] Keep the implementation available as a negative result / ablation unless later diagnostics suggest a hidden qualitative benefit.
+- [ ] Prefer a true iterative decoder objective next: mask-predict refinement, confidence-based correction, or local AR with explicit generated-token conditioning.
+
+### Status: [COMPLETE]
+
+## EXP-074: Decode Diagnostics for Smooth-Ramp Hierarchical 1024
+
+**Date:** 2026-06-17
+**Hypothesis:** Evaluating EXP-073's best checkpoint directly will show whether the smooth block-loss ramp improved late-block qualitative reconstruction and per-position balance, even though its headline final token accuracy was slightly below EXP-071.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp073_modal_dabe_hier1024_block_ramp_001`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=hierarchical_local`, `code_bits=1024`, `hierarchical_block_tokens=16`, `block_loss_weights=[1.0,1.125,1.25,1.375]`, TinyStories `4096/512`, T4, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates EXP-073's saved best checkpoint directly.
+- Full validation-set token/top-k/exact metrics are recomputed outside Trainer callback state.
+- Exact 16-token block and 32-token half metrics are reported.
+- Per-position accuracy and decoded samples are saved.
+- Results determine whether the smooth ramp should remain in the mainline or be treated as an analysis-only detour.
+
+### Decisions
+- [x] Use EXP-073 `best-step-0012000.ckpt`, matching the callback-selected best checkpoint.
+- [x] Keep dataset/eval settings aligned with EXP-072 for direct comparison.
+- [x] Launch detached Modal diagnostic probe and capture app ID + launch details.
+- [x] Pull diagnostics JSON and compare against EXP-072.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp074_modal_dabe_hier1024_ramp_decode_diag_001` |
+| Source run | `exp073_modal_dabe_hier1024_block_ramp_001` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-loY9FajBTVfBwMVqepkyDV` |
+| Launch contract | `experiments/modal_launches/20260617_212845_exp074_modal_dabe_hier1024_ramp_decode_diag_001.json` |
+| Run state | stopped cleanly at `2026-06-17 22:29:27 +01:00` |
+| Pulled artifacts | `experiments/modal_downloads/exp074_modal_dabe_hier1024_ramp_decode_diag_001/` |
+
+### Results
+| Metric | EXP-074 Value | EXP-072 Baseline | Delta |
+|--------|---------------|------------------|-------|
+| checkpoint | EXP-073 `best-step-0012000.ckpt` | EXP-071 `best-step-0012000.ckpt` | ramp vs unweighted |
+| batches / val chunks | `43` / `1351` | `43` / `1351` | matched |
+| token_ce | `1.40128` | `1.42377` | `-0.02249` |
+| token_acc | `0.72199` | `0.71836` | `+0.00363` |
+| token_top5_acc | `0.85761` | `0.85473` | `+0.00288` |
+| token_top10_acc | `0.89111` | `0.88924` | `+0.00187` |
+| exact_16token_block_acc | `0.05218` | `0.05403` | `-0.00185` |
+| exact_32token_half_acc | `0.00370` | `0.00370` | no change |
+| exact_64token_chunk_acc | `0.0` | `0.0` | no change |
+| bit_density | `0.49108` | `0.49158` | no collapse |
+| per_block_exact_acc | `[0.19097, 0.00888, 0.00444, 0.00444]` | `[0.19541, 0.01110, 0.00370, 0.00592]` | mixed / slightly worse |
+| per_half_exact_acc | `[0.00740, 0.0]` | `[0.00740, 0.0]` | no change |
+
+### Position / Block Accuracy
+| Span | EXP-074 Token Acc | EXP-072 Token Acc | Delta |
+|------|-------------------|-------------------|-------|
+| block 0 (`00-15`) | `0.77433` | `0.77484` | `-0.00051` |
+| block 1 (`16-31`) | `0.71373` | `0.70873` | `+0.00500` |
+| block 2 (`32-47`) | `0.70179` | `0.69606` | `+0.00574` |
+| block 3 (`48-63`) | `0.69809` | `0.69379` | `+0.00430` |
+| first half (`00-31`) | `0.74403` | `0.74179` | `+0.00224` |
+| second half (`32-63`) | `0.69994` | `0.69493` | `+0.00502` |
+| block gap `block0 - block3` | `0.07624` | `0.08105` | `-0.00481` |
+| position token-acc stddev | `0.03976` | `0.04409` | `-0.00433` |
+
+### Key Observations
+- The smooth ramp improved recomputed token/top-k accuracy versus EXP-072 diagnostics, despite EXP-073's final Trainer callback being slightly below EXP-071.
+- The improvement is concentrated in blocks 1-3 and the second half of the chunk; block 0 is essentially unchanged.
+- Positional imbalance is measurably lower: block0-to-block3 gap and per-position token-accuracy standard deviation both decreased.
+- Exact local reconstruction did not improve. The aggregate exact 16-token block rate fell slightly, and exact half/full-chunk reconstruction stayed unchanged.
+- Qualitative samples remain semantically/story-like but still substitute entities, adjectives, and local details. The ramp improves surface-token probability more than faithful exact decoding.
+
+### Decisions
+- [x] Treat smooth ramp as useful for token-level balance and reporting, but not as the main solution for exact local reconstruction.
+- [ ] Prefer structural decoder/refinement changes over stronger loss weights if the next goal is exact block recovery.
+- [ ] Keep EXP-071/EXP-074 as paired evidence: unweighted has slightly better callback final score, ramp has better diagnostic token balance.
+
+### Status: [COMPLETE]
+
+## EXP-073: Block-Balanced Hierarchical 1024 with Smooth Loss Ramp
+
+**Date:** 2026-06-17
+**Hypothesis:** A smooth block-loss ramp `[1.0, 1.125, 1.25, 1.375]` on the 1024-bit hierarchical-local tokenizer will reduce the severe block-exact imbalance observed in EXP-072 without using block permutation and without sacrificing the strong overall reconstruction quality of EXP-071.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1024`, `hierarchical_block_tokens=16`, `block_loss_weights=[1.0,1.125,1.25,1.375]`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` block-weighted loss and per-block metrics (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Training remains stable (`nan_batches=0`) if completed.
+- Overall token accuracy remains near EXP-071 (`0.72404`) while improving later block metrics.
+- Blocks 1-3 exact accuracy improve over EXP-072 (`0.01110`, `0.00370`, `0.00592`).
+- Second-half token accuracy improves over EXP-072 (`0.69493`).
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+- Per-block token/exact metrics are logged during training.
+
+### Decisions
+- [x] Do not use block-wise random permutation.
+- [x] Use user-selected smooth ramp `[1.0, 1.125, 1.25, 1.375]`.
+- [x] Preserve normal unweighted CE and aggregate metrics for comparability.
+- [x] Launch detached Modal run and capture app ID + launch contract.
+- [x] Pull artifacts and compare against EXP-071/072.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp073_modal_dabe_hier1024_block_ramp_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_local` |
+| Code width | `1024` bits (`16.0` bits/token) |
+| Block weights | `[1.0, 1.125, 1.25, 1.375]` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-w3sZgh1yryOQh580Iu90vH` |
+| Launch contract | `experiments/modal_launches/20260617_211204_exp073_modal_dabe_hier1024_block_ramp_001.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=18.14 eta_min=10.9`; `[eta] step=200/12000 sps=19.05 eta_min=10.3` |
+| Early status | passed dataset load and Trainer startup; model has `14.4M` trainable params |
+
+### Results
+| Metric | EXP-073 Value | Baseline / Reference | Delta |
+|--------|---------------|----------------------|-------|
+| `val_token_acc_last` | `0.71994` | EXP-071 final `0.72404`; EXP-072 diagnostic `0.71836` | `-0.00410` vs EXP-071; `+0.00158` vs EXP-072 |
+| `val_token_top5_acc_last` | `0.85592` | EXP-071 final `0.85799`; EXP-072 diagnostic `0.85473` | `-0.00207` vs EXP-071; `+0.00119` vs EXP-072 |
+| `val_token_top10_acc_last` | `0.89037` | EXP-071 final `0.89222`; EXP-072 diagnostic `0.88924` | `-0.00185` vs EXP-071; `+0.00113` vs EXP-072 |
+| `val_exact_chunk_acc_last` | `0.0` | EXP-071/072 `0.0` | no change |
+| `val_bit_density_last` | `0.49666` | EXP-071 `0.49429`; EXP-072 `0.49158` | non-collapsed |
+| Block token acc `[0,1,2,3]` | `[0.77308, 0.71072, 0.69652, 0.69944]` | EXP-072 `[0.7748, 0.7087, 0.6961, 0.6938]` | tail token accuracy modestly improved |
+| Block exact acc `[0,1,2,3]` | `[0.19023, 0.00666, 0.01036, 0.00518]` | EXP-072 `[0.19541, 0.01110, 0.00370, 0.00592]` | mixed; block 2 improves, blocks 0/1/3 decline |
+| Second-half token acc | `0.69798` | EXP-072 `0.69493` | `+0.00305` |
+| Stability | `nan_batches=0`, `stable=true` | required stable | pass |
+
+### Key Observations
+- The smooth ramp preserved most of the 1024-bit hierarchical-local quality but did not beat EXP-071 on headline token/top-k accuracy.
+- The ramp did slightly reduce the positional/block imbalance in token accuracy: later blocks, especially block 3, improved relative to EXP-072 diagnostics.
+- Exact 16-token block reconstruction did not improve reliably. Block 2 exact accuracy improved, but blocks 1 and 3 worsened, so the ramp is not sufficient as an exact-span fix.
+- Bit density remained healthy around `0.497`, so the weighted objective did not collapse the binary code distribution.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp073_modal_dabe_hier1024_block_ramp_001/` |
+| Modal run root | `/experiments/exp073_modal_dabe_hier1024_block_ramp_001/` on `dabe-experiments` |
+| Best checkpoint | `/experiments/exp073_modal_dabe_hier1024_block_ramp_001/checkpoints/best-step-0012000.ckpt` |
+| Last checkpoint | `/experiments/exp073_modal_dabe_hier1024_block_ramp_001/checkpoints/last.ckpt` |
+
+### Decisions
+- [x] Treat smooth block weighting as a modest balancing improvement, not a decisive architectural win.
+- [ ] Prefer a decode diagnostic probe on EXP-073 before deciding whether to keep the ramp in the mainline.
+- [ ] If pursuing exact local reconstruction, test a structural fix rather than stronger block weights alone.
+
+### Status: [COMPLETE]
+
+## EXP-072: Decode Diagnostics for 1024-bit Hierarchical Local Tokenizer
+
+**Date:** 2026-06-17
+**Hypothesis:** EXP-071's `256` bits per 16-token block may produce nonzero exact local-block reconstruction even though full 64-token exact reconstruction remains zero. Block/half diagnostics will determine whether the hierarchical tokenizer is close enough for refinement or still needs smaller blocks/more capacity.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp071_modal_dabe_hier_local_1024_001`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=hierarchical_local`, `code_bits=1024`, TinyStories `4096/512`, T4, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` with exact block/half metrics (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates EXP-071's saved best checkpoint directly.
+- Full validation-set token/top-k/exact metrics are recomputed outside Trainer callback state.
+- Exact 16-token block accuracy is reported overall and per block.
+- Exact 32-token half-chunk accuracy is reported.
+- Per-position accuracy and decoded sample outputs are saved.
+- Results determine whether next step should be block refinement, smaller blocks, or additional local capacity.
+
+### Decisions
+- [x] Run diagnostics on EXP-071 instead of EXP-069 because 1024-bit hierarchy dominates.
+- [x] Add exact block and half-chunk metrics to the diagnostics probe.
+- [x] Launch detached Modal probe and capture app ID + launch details.
+- [x] Pull diagnostics JSON and summarize failure pattern.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp072_modal_dabe_hier1024_decode_diag_001` |
+| Source run | `exp071_modal_dabe_hier_local_1024_001` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-AZrDyxLffyMXQImVLqvLbe` |
+| Run ID | `exp072_modal_dabe_hier1024_decode_diag_001` |
+| Launch command | direct `modal run -d` because `scripts/launch_modal_detached.py` does not pass custom function args |
+| Pulled artifacts | `experiments/modal_downloads/exp072_modal_dabe_hier1024_decode_diag_001/` |
+
+### Results
+| Metric | Value |
+|--------|-------|
+| checkpoint | EXP-071 `best-step-0012000.ckpt` |
+| batches / val chunks | `43` / `1351` |
+| token_ce | `1.42377` |
+| token_acc | `0.71836` |
+| token_top5_acc | `0.85473` |
+| token_top10_acc | `0.88924` |
+| exact_16token_block_acc | `0.05403` |
+| exact_32token_half_acc | `0.00370` |
+| exact_64token_chunk_acc | `0.0` |
+| bit_density | `0.49158` |
+| per_block_exact_acc | `[0.19541, 0.01110, 0.00370, 0.00592]` |
+| per_half_exact_acc | `[0.00740, 0.0]` |
+
+### Position / Block Accuracy
+| Span | Token Acc Mean | Top-5 Mean | Top-10 Mean |
+|------|----------------|------------|-------------|
+| block 0 (`00-15`) | `0.7748` | `0.8836` | `0.9117` |
+| block 1 (`16-31`) | `0.7087` | `0.8496` | `0.8850` |
+| block 2 (`32-47`) | `0.6961` | `0.8422` | `0.8798` |
+| block 3 (`48-63`) | `0.6938` | `0.8436` | `0.8805` |
+| first half (`00-31`) | `0.74179` | `0.86658` | `0.89834` |
+| second half (`32-63`) | `0.69493` | `0.84287` | `0.88014` |
+
+### Key Observations
+- Exact 16-token block reconstruction is now nonzero (`5.4%` overall), which is the first evidence that learned DABE codes can exactly reconstruct local spans.
+- Exact block reconstruction is highly front-loaded: block 0 reaches `19.5%`, but blocks 1-3 remain near zero (`1.1%`, `0.37%`, `0.59%`).
+- Token accuracy remains high across all blocks, but the first block is clearly easier (`0.7748`) than later blocks (`~0.694-0.709`).
+- Exact 32-token half reconstruction is barely nonzero (`0.37%`), and exact full-chunk remains zero.
+- Samples preserve much more local structure than earlier runs, but entity/name/detail substitution is still common.
+
+### Decisions
+- [x] Treat local exact reconstruction as achieved, but only weakly and mostly for the first block.
+- [ ] Add block-wise loss weighting or sampling to reduce first-block dominance.
+- [ ] Try an autoregressive or mask-predict refinement inside each 16-token block.
+- [ ] Consider shorter independent units only if block-balanced training fails to improve blocks 1-3.
+
+### Status: [COMPLETE]
+
+## EXP-071: Hierarchical Local-Code Decoder at 1024 Bits
+
+**Date:** 2026-06-17
+**Hypothesis:** Doubling the successful EXP-069 local hierarchical code from `512` to `1024` bits (`256` bits per 16-token block) will improve code-only reconstruction and may produce nonzero exact 16-token block reconstruction, while avoiding the flat/global 1024-bit inefficiency seen in earlier diffusion experiments.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1024`, `hierarchical_block_tokens=16`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` hierarchical-local decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Hierarchical structure remains `4 x 16-token` local blocks.
+- Total code budget is `1024` bits (`16.0` bits/token), with `256` bits per block.
+- Training remains stable (`nan_batches=0`) if completed.
+- Validation token accuracy beats EXP-069 (`>0.60427`) by enough to justify doubled bit budget.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+- Follow-up diagnostics measure exact 16-token block accuracy.
+
+### Decisions
+- [x] Test 1024 bits only on the hierarchical-local architecture, not flat/global full-window decoding.
+- [x] Keep all other run parameters aligned with EXP-069 for attribution.
+- [x] Launch detached Modal run and capture app ID + launch contract.
+- [x] Pull lightweight artifacts and compare against EXP-069.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp071_modal_dabe_hier_local_1024_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_local` |
+| Code width | `1024` bits (`16.0` bits/token) |
+| Local structure | `4` blocks x `16` tokens; `256` bits/block |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=1024 dabe_tokenizer.model.decoder_mode=hierarchical_local dabe_tokenizer.model.hierarchical_block_tokens=16 dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-GZUHyTZfOlqlIwDYZuNx4x` |
+| Launch contract | `experiments/modal_launches/20260617_202919_exp071_modal_dabe_hier_local_1024_001.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=16.64 eta_min=11.9`; `[eta] step=500/12000 sps=18.31 eta_min=10.5` |
+| Early status | passed dataset load and Trainer startup; model has `14.4M` trainable params |
+
+### Results
+| Metric | EXP-071 hierarchical 1024 | EXP-069 hierarchical 512 | Delta |
+|--------|---------------------------|--------------------------|-------|
+| run state | complete (`2026-06-17 21:42:39 +01:00`) | complete | pass |
+| stable / nan_batches | `true` / `0` | `true` / `0` | pass |
+| decoder mode | `hierarchical_local` | `hierarchical_local` | same architecture |
+| code bits | `1024` | `512` | `2x` budget |
+| bits/token | `16.0` | `8.0` | `2x` budget |
+| bits/block | `256` | `128` | `2x` local budget |
+| val_loss_first -> last | `11.03868 -> 1.39470` | `11.05624 -> 2.11849` | much better |
+| val_token_acc_last | `0.72404` | `0.60427` | `+0.11976` |
+| best val_token_acc | `0.72404` | `0.60427` | `+0.11976` |
+| val_token_top5_acc_last | `0.85799` | `0.76903` | `+0.08896` |
+| val_token_top10_acc_last | `0.89222` | `0.81632` | `+0.07590` |
+| val_exact_chunk_acc_last | `0.0` | `0.0` | unchanged |
+| val_bit_density_last | `0.49429` | `0.49331` | healthy |
+| final steps/sec | `17.2180` | `18.5585` | modest slowdown |
+| best checkpoint | `best-step-0012000.ckpt` | `best-step-0012000.ckpt` | final step best |
+| pulled artifacts | `experiments/modal_downloads/exp071_modal_dabe_hier_local_1024_001/` | local | complete |
+
+### Key Observations
+- Doubling local block capacity substantially improves reconstruction. The gain is large enough (`+11.98` token-accuracy points) to justify the detour, even though it doubles bits/token.
+- Unlike earlier flat/diffusion 1024-bit tests, the extra capacity is useful when applied locally: `256` bits per 16-token block beats `128` bits per block.
+- Bit density remains near ideal (`0.49429`), so the 1024-bit local code is being used without collapse.
+- Full 64-token exact reconstruction remains `0.0`; we need block-level exact reconstruction diagnostics before deciding whether this is viable as a tokenizer.
+- Throughput remains practical (`17.22` steps/sec), still comfortably within the 30-minute T4 protocol.
+
+### Decisions
+- [x] Treat hierarchical-local 1024 as the new quality leader.
+- [ ] Run decode diagnostics for EXP-071 with exact 16-token block accuracy and per-position analysis.
+- [ ] Compare 1024-bit block exact accuracy against a possible shorter `32`-token chunk run before changing the tokenizer unit.
+
+### Status: [COMPLETE]
+
+## EXP-070: Progressive Sliding-Window DABE Tokenizer
+
+**Date:** 2026-06-17
+**Hypothesis:** A coarse-to-fine sliding-window tokenizer with overlapping global/medium/fine binary codes can preserve EXP-069's local reconstruction gains while reducing hard block-boundary errors. Under the same `512`-bit / `64`-token budget, progressive overlapping windows should beat EXP-069's hierarchical-local token accuracy (`0.60427`) or at least improve top-k and positional smoothness.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=sliding_progressive`, `code_bits=512`, global `1x64->96` bits, medium `3x32 stride16 -> 192` bits, fine `7x16 stride8 -> 224` bits, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` sliding-progressive decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Total bit budget remains `512` bits (`8.0` bits/token).
+- Sliding allocation is exactly `96 + 3*64 + 7*32 = 512` bits.
+- Training remains stable (`nan_batches=0`) if completed.
+- Validation token accuracy beats EXP-069 (`>0.60427`) or documents whether overlap trades top-1 for top-k/smoother positions.
+- Exact full-chunk accuracy and bit density are logged.
+- Follow-up diagnostics can measure 16-token and 32-token window exact accuracy.
+
+### Decisions
+- [x] Use progressive overlap before changing chunk size.
+- [x] Keep total code width fixed at `512` bits for fair comparison.
+- [x] Add `decoder_mode=sliding_progressive` with global/medium/fine window encoders.
+- [x] Launch detached Modal run and capture app ID + launch contract.
+- [x] Pull lightweight artifacts and compare against EXP-069.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp070_modal_dabe_sliding_progressive_512_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `sliding_progressive` |
+| Code width | `512` bits (`8.0` bits/token) |
+| Allocation | global `96`, medium `3*64`, fine `7*32` |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=512 dabe_tokenizer.model.decoder_mode=sliding_progressive dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-v5O57HtMA7ClNlWoIgVVAo` |
+| Launch contract | `experiments/modal_launches/20260617_185722_exp070_modal_dabe_sliding_progressive_512_001.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=13.85 eta_min=14.3`; `[eta] step=600/12000 sps=14.33 eta_min=13.3` |
+| Early status | passed dataset load and Trainer startup; model has `14.1M` trainable params |
+
+### Results
+| Metric | EXP-070 sliding progressive | EXP-069 hierarchical local | Delta |
+|--------|-----------------------------|----------------------------|-------|
+| run state | complete (`2026-06-17 20:12:38 +01:00`) | complete | pass |
+| stable / nan_batches | `true` / `0` | `true` / `0` | pass |
+| decoder mode | `sliding_progressive` | `hierarchical_local` | overlap vs disjoint local |
+| model params | `14.1M` | `10.0M` | `+4.1M` |
+| code bits | `512` | `512` | same budget |
+| bits/token | `8.0` | `8.0` | same compression |
+| val_loss_first -> last | `10.88058 -> 2.38095` | `11.05624 -> 2.11849` | worse final CE |
+| val_token_acc_last | `0.58686` | `0.60427` | `-0.01742` |
+| best val_token_acc | `0.59037` | `0.60427` | `-0.01390` |
+| val_token_top5_acc_last | `0.75531` | `0.76903` | `-0.01372` |
+| val_token_top10_acc_last | `0.80476` | `0.81632` | `-0.01155` |
+| val_exact_chunk_acc_last | `0.0` | `0.0` | unchanged |
+| val_bit_density_last | `0.49640` | `0.49331` | healthy |
+| final steps/sec | `14.3711` | `18.5585` | slower |
+| best checkpoint | `best-step-0008000.ckpt` | `best-step-0012000.ckpt` | saved |
+| pulled artifacts | `experiments/modal_downloads/exp070_modal_dabe_sliding_progressive_512_001/` | local | complete |
+
+### Key Observations
+- Progressive overlapping windows are stable and strong, but they do not improve over the simpler EXP-069 disjoint local hierarchy.
+- Sliding overlap costs throughput and parameters (`14.1M`, `14.37` steps/sec) while trailing hierarchical-local token accuracy by about `1.4` points at best.
+- Bit density remains ideal (`0.49640`), so the result is not a code-collapse failure.
+- The best checkpoint occurs at step `8000` while final-step metrics degrade slightly, suggesting mild overtraining or optimization noise.
+- For this budget, hard local 16-token codes appear more useful than overlapping multi-scale code allocation. The overlap may dilute bit capacity: fine windows get only `32` bits per 16-token span versus EXP-069's `128` bits per 16-token block.
+
+### Decisions
+- [x] Keep EXP-069 hierarchical-local as the current best architecture.
+- [ ] Run EXP-069 decode diagnostics with exact 16-token block accuracy before trying more architecture changes.
+- [ ] If we revisit sliding windows, allocate more bits to fine windows or reduce the number of overlapping windows to avoid starving local detail.
+- [ ] Consider a hybrid: EXP-069 local `128`-bit blocks plus a small global context code, instead of splitting the same 512 bits across too many overlapping windows.
+
+### Status: [COMPLETE]
+
+## EXP-069: Hierarchical Local-Code Decoder for 512-bit DABE Tokenizer
+
+**Date:** 2026-06-17
+**Hypothesis:** Splitting a 64-token chunk into four 16-token local binary codes under the same `512`-bit budget will reduce the positional decay observed in EXP-068 and improve code-only reconstruction over EXP-067 without returning to the irreversible scalar hierarchy failure mode.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=512`, `hierarchical_block_tokens=16`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` hierarchical-local decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal run completes or checkpoints within the `1800s` T4 cap.
+- Hierarchical code keeps the same total budget as EXP-067 (`512` bits / `64` tokens = `8` bits/token).
+- Local block structure is `4 x 16 tokens`, with `128` bits per block.
+- Training remains stable (`nan_batches=0`) if completed.
+- Validation token accuracy beats EXP-067 best-checkpoint diagnostic (`>0.37479`).
+- First-half vs second-half positional gap decreases relative to EXP-068 (`0.42103 - 0.32855 = 0.09248`) in follow-up diagnostics.
+- Exact 16-token block reconstruction becomes nonzero, or full-chunk exact reconstruction remains documented as a failure.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Use local binary hierarchy, not scalar hierarchy.
+- [x] Preserve the full 64-token tokenizer chunk for comparability.
+- [x] Keep total code width fixed at `512` bits.
+- [x] Launch detached Modal run and capture app ID + launch contract.
+- [x] Pull lightweight artifacts and compare against EXP-067/068.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp069_modal_dabe_hier_local_512_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `hierarchical_local` |
+| Code width | `512` bits (`8.0` bits/token) |
+| Local structure | `4` blocks x `16` tokens; `128` bits/block |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=512 dabe_tokenizer.model.decoder_mode=hierarchical_local dabe_tokenizer.model.hierarchical_block_tokens=16 dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-n5mEJ6MhlwHFsKSRvd8FZx` |
+| Launch contract | `experiments/modal_launches/20260617_183437_exp069_modal_dabe_hier_local_512_001.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=18.59 eta_min=10.7`; `[eta] step=200/12000 sps=19.57 eta_min=10.0` |
+| Early status | passed dataset load and Trainer startup; model has `10.0M` trainable params |
+
+### Results
+| Metric | EXP-069 hierarchical local | EXP-067 code-transformer | Delta |
+|--------|----------------------------|--------------------------|-------|
+| run state | complete (`2026-06-17 19:45:17 +01:00`) | complete | pass |
+| stable / nan_batches | `true` / `0` | `true` / `0` | pass |
+| decoder mode | `hierarchical_local` | `code_transformer` | local hierarchy |
+| code bits | `512` | `512` | same budget |
+| bits/token | `8.0` | `8.0` | same compression |
+| val_loss_first -> last | `11.05624 -> 2.11849` | `10.98125 -> 3.72882` | much better |
+| val_token_acc_last | `0.60427` | `0.37163` | `+0.23264` |
+| best val_token_acc | `0.60427` | `0.37618` | `+0.22809` |
+| val_token_top5_acc_last | `0.76903` | `0.56545` | `+0.20358` |
+| val_token_top10_acc_last | `0.81632` | `0.63474` | `+0.18158` |
+| val_exact_chunk_acc_last | `0.0` | `0.0` | unchanged |
+| val_bit_density_last | `0.49331` | `0.47867` | healthy |
+| final steps/sec | `18.5585` | `18.9684` | modest overhead |
+| best checkpoint | `best-step-0012000.ckpt` | `best-step-0008000.ckpt` | final step best |
+| pulled artifacts | `experiments/modal_downloads/exp069_modal_dabe_hier_local_512_001/` | local | complete |
+
+### Key Observations
+- Local binary hierarchy is a major improvement under the same bit budget. Token accuracy rises from EXP-067's best-checkpoint diagnostic `0.37479` to `0.60427`.
+- The result supports the hypothesis that EXP-068's positional decay was a decoder sequence-burden issue rather than an information-collapse issue.
+- Bit density remains near ideal (`0.49331`), so local codes are not trivially saturating.
+- Exact full 64-token reconstruction remains `0.0`; the next diagnostic should compute exact 16-token local-block accuracy, since that is now the natural unit of the architecture.
+- Throughput remains practical on T4 (`18.56` steps/sec), only slightly slower than the flat code-transformer.
+
+### Decisions
+- [x] Keep hierarchical local-code path; it did not undo progress.
+- [ ] Run decode diagnostics for EXP-069, including per-position and exact 16-token block accuracy.
+- [ ] If block exact accuracy is nonzero, try block-wise iterative/mask refinement before changing total bit budget.
+- [ ] If block exact remains zero, test `32`-token chunks with this local hierarchy to isolate span length vs code capacity.
+
+### Status: [COMPLETE]
+
+## EXP-068: Decode Diagnostics for 512-bit Code-Only Transformer
+
+**Date:** 2026-06-17
+**Hypothesis:** Directly evaluating EXP-067's saved best checkpoint and inspecting per-position/sample-level decode behavior will reveal whether reconstruction failures are concentrated at later positions, rare tokens, punctuation/spacing, or globally distributed across the chunk.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp067_modal_dabe_code_transformer_512_001`, `checkpoint=best-step-0008000.ckpt`, `decoder_mode=code_transformer`, `code_bits=512`, TinyStories `4096/512`, T4, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates the saved EXP-067 best checkpoint directly.
+- Full validation-set token/top-k/exact metrics are recomputed outside Trainer callback state.
+- Per-position token/top-5/top-10 accuracy arrays are saved.
+- Worst/best positions are summarized.
+- At least 12 target/prediction decoded text samples are saved with token match masks.
+- Results clarify whether to scale decoder capacity, add AR/mask refinement, or change chunking.
+
+### Decisions
+- [x] Run diagnostics before training another architecture.
+- [x] Use the best checkpoint selected during EXP-067 rather than final-step callback metrics.
+- [x] Launch detached Modal probe and capture app ID + launch contract.
+- [x] Pull diagnostics JSON and summarize failure pattern.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp068_modal_dabe_code_transformer_decode_diag_001` (failed launch), `exp068_modal_dabe_code_transformer_decode_diag_002` (successful) |
+| Source run | `exp067_modal_dabe_code_transformer_512_001` |
+| Checkpoint | `best-step-0008000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Attempt 1 | `exp068_modal_dabe_code_transformer_decode_diag_001`; failed before app creation due Modal server connection error |
+| Attempt 1 contract | `experiments/modal_launches/20260617_161811_exp068_modal_dabe_code_transformer_decode_diag_001.json` |
+| Attempt 2 App ID | `ap-xbZcG7poQ6Aw8hjHK67JzC` |
+| Attempt 2 Run ID | `exp068_modal_dabe_code_transformer_decode_diag_002` |
+| Attempt 2 contract | `experiments/modal_launches/20260617_175637_exp068_modal_dabe_code_transformer_decode_diag_002.json` |
+| Pulled artifacts | `experiments/modal_downloads/exp068_modal_dabe_code_transformer_decode_diag_002/` |
+
+### Results
+| Metric | Value |
+|--------|-------|
+| checkpoint | EXP-067 `best-step-0008000.ckpt` |
+| batches / val chunks | `43` / `1351` |
+| token_ce | `3.61630` |
+| token_acc | `0.37479` |
+| token_top5_acc | `0.56545` |
+| token_top10_acc | `0.63421` |
+| exact_chunk_acc | `0.0` |
+| bit_density | `0.47869` |
+| first-half token_acc | `0.42103` |
+| second-half token_acc | `0.32855` |
+| best position | `1` (`0.53812`) |
+| worst position | `63` (`0.26573`) |
+
+### Position Bands
+| Positions | Token Acc Mean | Top-5 Mean | Top-10 Mean |
+|-----------|----------------|------------|-------------|
+| `00-07` | `0.5141` | `0.6586` | `0.7088` |
+| `08-15` | `0.4435` | `0.6144` | `0.6738` |
+| `16-23` | `0.3556` | `0.5527` | `0.6256` |
+| `24-31` | `0.3710` | `0.5676` | `0.6449` |
+| `32-39` | `0.3357` | `0.5361` | `0.6106` |
+| `40-47` | `0.3299` | `0.5356` | `0.6034` |
+| `48-55` | `0.3331` | `0.5385` | `0.6142` |
+| `56-63` | `0.3155` | `0.5201` | `0.5923` |
+
+### Key Observations
+- The best-checkpoint recomputation is slightly better than EXP-067 final callback metrics (`0.37479` vs `0.37163` token accuracy), but still no exact full-chunk reconstructions.
+- Reconstruction has a strong position decay: positions `0-7` average `0.5141`, while positions `56-63` average only `0.3155`.
+- The first half of chunks is materially easier than the second half (`0.42103` vs `0.32855` token accuracy), which points to limited sequence modeling/capacity over 64-token chunks rather than pure vocabulary confusion.
+- Samples show TinyStories-like local phrasing but weak semantic/entity preservation: predictions often retain common templates such as `"Once upon a time"` and dialogue markers while replacing names, nouns, and event details.
+- Top-10 remains much higher than top-1 (`0.63421` vs `0.37479`), so iterative refinement or constrained sampling may recover more tokens if conditioned on code-only logits.
+
+### Decisions
+- [x] Diagnose code-transformer failure mode as positional/sequence-consistency degradation, not bit collapse.
+- [ ] Try shorter chunks (`32` tokens, `512` bits = `16` bits/token or `256` bits = `8` bits/token) to test whether exact reconstruction appears when sequence length is halved.
+- [ ] Add an autoregressive or iterative mask-predict refinement stage over the code-transformer logits.
+- [ ] Add per-token frequency/type breakdown if shorter chunks still fail exact reconstruction.
+
+### Status: [COMPLETE]
+
+## EXP-067: Code-Only Transformer Decoder for 512-bit DABE Tokenizer
+
+**Date:** 2026-06-17
+**Hypothesis:** A code-only Transformer decoder that receives only the learned `512`-bit DABE code plus learned positions will outperform the 256-bit mirror decoder from EXP-064 without the teacher-forcing mismatch exposed by EXP-066. This should provide a clean test of whether the binary code itself can reconstruct 64-token chunks.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`decoder_mode=code_transformer`, `code_bits=512`, `max_steps=12000`, `batch_size=32`, TinyStories `4096/512`, T4, `bf16-mixed`, 30-minute function timeout), `src/training/dabe_tokenizer_autoencoder.py` code-transformer decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal launch succeeds on one T4 with the existing `1800s` timeout.
+- Decoder receives no target-token embeddings and no noisy target embeddings.
+- Training remains stable (`nan_batches=0`) if completed.
+- Validation token accuracy beats EXP-064 mirror baseline (`>0.31902`).
+- Exact chunk accuracy becomes nonzero or clearly documents continued sequence-level failure.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+- ETA logging is present.
+
+### Decisions
+- [x] Add `decoder_mode=code_transformer` while preserving `mirror` and `diffusion` modes.
+- [x] Use `512` bits as the working point based on EXP-065/066.
+- [x] Avoid diffusion in this run; this is the clean code-only reconstruction baseline.
+- [x] Launch detached Modal run and capture app ID + launch contract.
+- [x] Pull lightweight artifacts and compare against EXP-064, EXP-065, and EXP-066.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp067_modal_dabe_code_transformer_512_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Decoder | `code_transformer` |
+| Code width | `512` bits (`8.0` bits/token) |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=512 dabe_tokenizer.model.decoder_mode=code_transformer dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-r978ZbTX5DZzEm1FtJUIrS` |
+| Launch contract | `experiments/modal_launches/20260617_155213_exp067_modal_dabe_code_transformer_512_001.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=18.72 eta_min=10.6`; `[eta] step=600/12000 sps=19.44 eta_min=9.8` |
+| Early status | passed dataset load and Trainer startup; model has `9.2M` trainable params |
+
+### Results
+| Metric | EXP-067 512-bit code-transformer | EXP-064 256-bit mirror | EXP-066 512-bit reverse diffusion | Interpretation |
+|--------|-----------------------------------|-------------------------|------------------------------------|----------------|
+| run state | complete (`2026-06-17 17:04:31 +01:00`) | complete | complete | Pass |
+| stable / nan_batches | `true` / `0` | `true` / `0` | probe only | Pass |
+| decoder input | code bits + positions only | code bits + positions only | Gaussian noise + code bits | EXP-067 is an honest code-only decoder |
+| code bits | `512` | `256` | `512` | EXP-067 uses `8.0` bits/token |
+| val_loss_first -> last | `10.98125 -> 3.72882` | `10.81507 -> 4.05674` | N/A | Better final CE than mirror |
+| val_token_acc_last | `0.37163` | `0.31902` | `0.17547` | Beats mirror by `+0.05261` absolute |
+| best val_token_acc | `0.37618` | `0.31902` | `0.17770` one-step / `0.17547` DDIM | Best observed checkpoint-level signal |
+| val_token_top5_acc_last | `0.56545` | `0.51597` | `0.22505` | Beats mirror |
+| val_token_top10_acc_last | `0.63474` | `0.59262` | `0.24690` | Beats mirror |
+| val_exact_chunk_acc_last | `0.0` | `0.0` | `0.0` | Sequence-level exact reconstruction still fails |
+| val_bit_density_last | `0.47867` | `0.49036` | `0.43694` | Healthy/non-collapsed |
+| ETA/sys metric rows | `120` | `120` | N/A | Observability present |
+| final steps/sec | `18.9684` | `20.7441` | N/A | Transformer overhead modest |
+| best checkpoint | Modal volume: `checkpoints/best-step-0008000.ckpt` | `best-step-0008000.ckpt` | N/A | Saved |
+| pulled artifacts | `experiments/modal_downloads/exp067_modal_dabe_code_transformer_512_001/` | local | local | Lightweight artifacts pulled |
+
+### Key Observations
+- The code-only Transformer decoder is a genuine improvement over the mirror decoder without teacher-forcing leakage: final token accuracy rises from `0.31902` to `0.37163`.
+- Top-k metrics improve as well, suggesting the code contains more recoverable information than the per-position mirror head could extract.
+- Exact 64-token chunk accuracy remains `0.0`, so the architecture is not yet a usable replacement tokenizer.
+- The best token accuracy occurs before the final validation (`0.37618` best vs `0.37163` last), and best checkpoint selection by `val/loss` picked step `8000`; next probes should evaluate best checkpoint directly rather than relying only on final callback metrics.
+- Bit density remains healthy (`0.47867`), so the 512-bit code is not collapsing.
+
+### Decisions
+- [x] Treat code-only sequence decoding as the right baseline path; it is more honest than teacher-forced diffusion and stronger than mirror.
+- [ ] Add per-position accuracy and decoded sample inspection to understand which token positions/types fail.
+- [ ] Try stronger code-only decoders before returning to diffusion: deeper Transformer, causal/AR refinement, or iterative mask-predict.
+- [ ] Evaluate the saved best checkpoint directly and compare against final-step metrics.
+
+### Status: [COMPLETE]
+
+## EXP-066: Pure Reverse-Diffusion Decode Probe for DABE Tokenizer
+
+**Date:** 2026-06-17
+**Hypothesis:** If EXP-065's diffusion decoder has learned a usable tokenizer decode path rather than only a teacher-forced denoising shortcut, then validation chunks encoded to binary DABE codes should reconstruct from Gaussian noise using reverse diffusion conditioned only on the learned bits. `512` bits should remain the preferred working point unless `1024` substantially improves pure sampled decode.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`decoder_mode=diffusion`, checkpoints from `exp065_modal_dabe_tokae_diffusion_bits_sweep_001`, `code_bits in {512,1024}`, full validation batches, `sample_steps=64`, T4, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_reverse_diffusion_probe`, `src/training/dabe_tokenizer_autoencoder.py` reverse DDIM sampler (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe runs on the existing EXP-065 checkpoints without retraining.
+- Decode starts from Gaussian noise and is conditioned only on encoded validation-set binary codes.
+- Metrics include iterative `reverse_ddim` and one-step high-noise baseline `one_step_tmax`.
+- Probe covers the full validation set or documented capped batches.
+- `reverse_ddim/token_acc` is meaningfully above chance and preferably approaches the teacher-forced EXP-065 denoising metric.
+- `512` vs `1024` comparison determines whether larger code width helps pure sampled decode.
+
+### Decisions
+- [x] Run probe before additional training; this is the critical validity check for the diffusion-tokenizer claim.
+- [x] Evaluate both `512` and `1024` checkpoints from EXP-065.
+- [x] Report one-step high-noise decode as a baseline for whether iterative reverse diffusion helps.
+- [x] Launch detached Modal probe and capture app ID + launch contract.
+- [x] Pull probe artifacts and update interpretation.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp066_modal_dabe_reverse_diffusion_probe_001` |
+| Source run | `exp065_modal_dabe_tokae_diffusion_bits_sweep_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_reverse_diffusion_probe` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Bit widths | `512`, `1024` |
+| Probe | validation chunks -> encode bits -> discard token embeddings -> Gaussian noise -> reverse diffusion decode |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-H5czLxLwpEeD8uzt8YWQZ1` |
+| Run ID | `exp066_modal_dabe_reverse_diffusion_probe_001` |
+| Launch contract | `experiments/modal_launches/20260617_154358_exp066_modal_dabe_reverse_diffusion_probe_001.json` |
+| App stopped | 2026-06-17 16:46:46 +01:00 |
+| Pulled artifacts | `experiments/modal_downloads/exp066_modal_dabe_reverse_diffusion_probe_001/` |
+
+### Results
+| Metric | 512-bit one-step t=max | 512-bit reverse DDIM | 1024-bit one-step t=max | 1024-bit reverse DDIM | EXP-065 teacher-forced val |
+|--------|-------------------------|----------------------|--------------------------|-----------------------|----------------------------|
+| batches | `43` | `43` | `43` | `43` | full validation |
+| code bits | `512` | `512` | `1024` | `1024` | `512` / `1024` |
+| bits/token | `8.0` | `8.0` | `16.0` | `16.0` | `8.0` / `16.0` |
+| token_acc | `0.17770` | `0.17547` | `0.17455` | `0.18158` | `0.85311` / `0.85292` |
+| token_top5_acc | `0.25807` | `0.22505` | `0.23998` | `0.22173` | `0.89464` / `0.89406` |
+| token_top10_acc | `0.30772` | `0.24690` | `0.26874` | `0.23863` | `0.90922` / `0.90866` |
+| exact_chunk_acc | `0.0` | `0.0` | `0.0` | `0.0` | `0.30348` / `0.30496` |
+| bit_density | `0.43694` | `0.43694` | `0.35137` | `0.35137` | `0.44461` / `0.36236` |
+| embed_mse | `241.81819` | `299.93339` | `295.22215` | `298.22975` | `1.49054` / `1.51858` |
+
+### Key Observations
+- Pure sampled decode does not reproduce the EXP-065 teacher-forced denoising quality. Token accuracy falls from `~0.853` to `~0.18`, and exact chunk accuracy returns to `0.0`.
+- Iterative reverse DDIM does not help over a one-step high-noise denoise. For `512` bits it is worse (`0.17547` vs `0.17770` token accuracy); for `1024` bits it is slightly better (`0.18158` vs `0.17455`) but still far below usable decode quality.
+- The large embedding MSE under sampled decode indicates trajectory mismatch: the model learned to denoise around real token-embedding noising paths, but its own sampled reverse trajectory leaves the training distribution.
+- `1024` bits is only marginally better than `512` in pure reverse token accuracy and remains more sparse; this does not justify doubling the code width.
+
+### Decisions
+- [x] Do not claim EXP-065 as standalone tokenizer reconstruction quality.
+- [x] Keep `512` bits as the preferred width if we continue this branch.
+- [ ] Train with an inference-consistent objective: scheduled self-conditioning / denoiser rollout loss / mask-predict from code-only latent, rather than only teacher-forced random-timestep denoising.
+- [ ] Add a code-only decoder baseline that predicts token embeddings from bits without noisy target embeddings, then optionally refine with diffusion.
+
+### Status: [COMPLETE]
+
+## EXP-065: Modal DABE Tokenizer Diffusion Decoder Bit-Width Sweep
+
+**Date:** 2026-06-17
+**Hypothesis:** Replacing the direct mirror decoder with a lightweight diffusion-style sequence denoiser and increasing the fixed binary code from `256` bits to `512` or `1024` bits per 64-token chunk will improve reconstruction accuracy beyond EXP-064 while keeping bit density non-collapsed under the same 30-minute T4 cap.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal sweep overrides (`decoder_mode=diffusion`, `code_bits in {512,1024}`, `max_steps=6000`, `batch_size=32`, T4, `bf16-mixed`, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder_sweep`, `src/training/dabe_tokenizer_autoencoder.py` diffusion decoder (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Single detached Modal app runs both bit widths sequentially on one T4 allocation.
+- Total app runtime is bounded by the existing `1800s` Modal function timeout.
+- Each child run writes its own config, logs, stage result, and checkpoint under `bits_512/` and `bits_1024/`.
+- ETA logging is present for both child runs.
+- Training remains stable (`nan_batches=0`) for completed child runs.
+- `512` or `1024` bit diffusion decoder improves validation token accuracy over EXP-064's `0.31902`, or clearly documents a compute/quality regression.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+- Diffusion embedding reconstruction metric (`val/diffusion_embed_mse`) is logged.
+
+### Decisions
+- [x] Use a single Modal sweep job instead of two concurrent apps to keep one T4 allocation and cleaner runtime accounting.
+- [x] Keep the sweep sequential rather than two concurrent trainers on `cuda:0`, avoiding VRAM/kernel/checkpoint contention.
+- [x] Preserve the previous mirror decoder as `decoder_mode=mirror` for reproducible baselines.
+- [x] Add `decoder_mode=diffusion` with random-timestep embedding denoising conditioned on the binary code.
+- [x] Launch detached Modal sweep and capture app ID + launch contract.
+- [x] Pull completed lightweight artifacts and compare `512` vs `1024` vs EXP-064.
+
+### Planned Launch
+| Field | Value |
+|------|-------|
+| Run ID | `exp065_modal_dabe_tokae_diffusion_bits_sweep_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder_sweep` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Bit widths | `512`, `1024` |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=6000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=1000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-IVfjZ6sIEsqdNiVqh7mvzL` |
+| Run ID | `exp065_modal_dabe_tokae_diffusion_bits_sweep_001` |
+| Launch contract | `experiments/modal_launches/20260617_152231_exp065_modal_dabe_tokae_diffusion_bits_sweep_001.json` |
+| Early ETA evidence | `[eta] step=100/6000 sps=18.65 eta_min=5.3` |
+| Early status | first child run passed dataset load and Trainer startup; diffusion decoder active (`9.1M` params for `512` bits) |
+
+### Results
+| Metric | 512-bit diffusion | 1024-bit diffusion | EXP-064 256-bit mirror | Interpretation |
+|--------|-------------------|--------------------|-------------------------|----------------|
+| run state | complete | complete | complete | Both child runs finished inside one Modal app |
+| app stopped | 2026-06-17 16:34:32 +01:00 | 2026-06-17 16:34:32 +01:00 | 2026-06-17 14:11:04 +01:00 | Sweep took `~12.6m` total |
+| stable / nan_batches | `true` / `0` | `true` / `0` | `true` / `0` | Pass |
+| code bits | `512` | `1024` | `256` | Bit-width sweep |
+| bits/token | `8.0` | `16.0` | `4.0` | Compression cost doubles/quadruples vs EXP-064 |
+| decoder mode | `diffusion` | `diffusion` | `mirror` | New denoising decoder |
+| val_loss_first -> last | `11.02542 -> 1.10139` | `11.10423 -> 1.10949` | `10.81507 -> 4.05674` | Large teacher-forced denoising improvement |
+| val_token_acc_last | `0.85311` | `0.85292` | `0.31902` | Diffusion objective strongly improves token reconstruction metric |
+| val_exact_chunk_acc_last | `0.30348` | `0.30496` | `0.0` | Exact chunk reconstruction becomes nonzero under denoising objective |
+| val_token_top5_acc_last | `0.89464` | `0.89406` | `0.51597` | Strong top-k lift |
+| val_token_top10_acc_last | `0.90922` | `0.90866` | `0.59262` | Strong top-k lift |
+| val_bit_density_last | `0.44461` | `0.36236` | `0.49036` | 1024-bit run trends toward sparse but remains inside gate |
+| val_diffusion_embed_mse_last | `1.49054` | `1.51858` | N/A | Denoising embedding objective logged |
+| sys ETA rows | `60` | `60` | `120` | ETA present for both child runs |
+| final steps/sec | `18.8333` | `18.6670` | `20.7441` | Diffusion overhead is modest |
+| best checkpoint | Modal volume: `bits_512/checkpoints/best-step-0006000.ckpt` | Modal volume: `bits_1024/checkpoints/best-step-0006000.ckpt` | local + Modal: `best-step-0008000.ckpt` | Checkpoints saved; large ckpts not pulled locally for EXP-065 |
+
+### Key Observations
+- A single T4 allocation was sufficient for both bit widths: the sequential sweep completed in about `12.6` minutes, well below the `30` minute cap.
+- `512` and `1024` bits are effectively tied on the denoising reconstruction metrics. The extra `512` bits did not buy meaningful token accuracy in this short run.
+- The `1024`-bit code has lower bit density (`0.36236`) than the `512`-bit code (`0.44461`), suggesting the larger code may be underused or beginning to sparsify.
+- The diffusion decoder metrics are not directly equivalent to pure code-only mirror decoding: this first implementation trains and validates a random-timestep denoising decoder using noisy target-token embeddings plus the binary code. It is therefore a strong positive signal for diffusion-assisted sequence reconstruction, but it still needs a pure reverse-diffusion decode probe from noise before we can claim tokenizer replacement quality.
+- Given the tie, `512` bits is the better next candidate: same accuracy, denser code use, lower compression cost (`8` bits/token vs `16`).
+
+### Decisions
+- [x] Treat `512`-bit diffusion as the next working point.
+- [ ] Add an evaluation-only reverse-diffusion sampler that decodes from Gaussian noise conditioned only on the learned binary code.
+- [ ] Compare teacher-forced denoising metrics against pure sampled decode metrics before claiming reconstruction quality.
+- [ ] Consider reducing `1024`-bit regularization or adding code-utilization loss only if sampled decode shows a real benefit from larger codes.
+
+### Status: [COMPLETE]
+
+## EXP-064: Modal TinyStories DABE Tokenizer Autoencoder Longer Run
+
+**Date:** 2026-06-17
+**Hypothesis:** Extending the EXP-063 TinyStories tokenizer-autoencoder run to a larger sample/step budget under the same T4 30-minute cap will improve reconstruction accuracy beyond `24.0%` token top-1 while preserving a balanced binary bottleneck.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`train_samples=16384`, `val_samples=2048`, `max_steps=12000`, `batch_size=32`, T4, `bf16-mixed`, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py`, `src/training/dabe_tokenizer_autoencoder.py` top-k metric update (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal launch succeeds on `qrk-labs`.
+- Run stays within the `1800s` Modal timeout or leaves checkpoint/metrics artifacts if capped.
+- Training remains stable (`nan_batches=0`) if the run completes.
+- Validation token top-1 improves over EXP-063 (`>0.24013`) or shows a clear plateau/failure mode.
+- New top-k metrics (`val/token_top5_acc`, `val/token_top10_acc`) are logged.
+- Bit density remains non-collapsed (`0.35 <= val_bit_density <= 0.65`).
+
+### Decisions
+- [x] Add top-5/top-10 token accuracy logging before launch.
+- [x] Keep the fixed-width codec unchanged (`64` BPE tokens -> `256` bits).
+- [x] Use a larger TinyStories sample budget and `12000` max steps.
+- [x] Launch detached run and capture app ID + launch contract.
+- [x] Pull summary/checkpoint after completion or timeout.
+- [x] Patch tokenizer-autoencoder ETA logging after Attempt 3 exposed missing runtime observability.
+- [x] Relaunch ETA-enabled confirmation run.
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-ZZQXyEDJBXo2MtM2EQmP9A` |
+| Run ID | `exp064_modal_dabe_tokae_tinystories_t4_30m_long_001` |
+| Config | `dabe_tokenizer_autoencoder_smoke` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | `T4` |
+| Timeout | `1800s` |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=16384 dabe_tokenizer.dataset.val_samples=2048 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=500 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+| Launch contract | `experiments/modal_launches/20260617_115543_exp064_modal_dabe_tokae_tinystories_t4_30m_long_001.json` |
+| Early status | `ephemeral (detached)`, `Tasks=1`; volume contains `config.yaml` |
+
+### Attempt 1 Failure
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| failure phase | dataset load before training | training starts | No |
+| failure type | Hugging Face CDN `408 Request Time-out` while streaming TinyStories parquet range | no data-load error | No |
+| checkpoints produced | `0` | `>=1` | No |
+| metrics produced | `0` | `>=1` | No |
+
+### Attempt 1 Observations
+- The failure happened before Trainer construction, so no model-quality conclusion can be drawn.
+- The larger `train_samples=16384` streaming request reached a fragile Hugging Face/Xet range read path. EXP-063 succeeded with `4096/512`, so Attempt 2 will keep the longer optimization budget but revert to the proven sample size.
+
+### Attempt 2 Launch Details
+| Field | Value |
+|------|-------|
+| App ID | `ap-hNVxTWQtdKO7cGynO8Gc2G` |
+| Run ID | `exp064_modal_dabe_tokae_tinystories_t4_30m_long_002` |
+| Runtime hardening | `HF_HUB_DISABLE_XET=1` in Modal bootstrap |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=500 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+| Launch contract | `experiments/modal_launches/20260617_120056_exp064_modal_dabe_tokae_tinystories_t4_30m_long_002.json` |
+| Early status | `ephemeral (detached)`, `Tasks=1`; volume contains `config.yaml` and `logs/` |
+
+### Attempt 2 Failure
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| failure phase | Trainer data setup before first training step | training starts | No |
+| failure type | `val_check_interval=500` exceeded `353` train batches | valid validation cadence | No |
+| checkpoints produced | `0` | `>=1` | No |
+| metrics produced | `0` | `>=1` | No |
+
+### Attempt 2 Observations
+- Dataset loading succeeded after disabling Xet and reverting to `4096/512`, so Attempt 1's `408` was isolated to the data-fetch path.
+- The run failed because the longer-run validation cadence was copied from the larger sample plan. Attempt 3 will use `val_check_interval=300`, which is valid for `353` train batches.
+
+### Attempt 3 Launch Details
+| Field | Value |
+|------|-------|
+| App ID | `ap-NVMNKkbEc0v9FiYpOJeAZo` |
+| Run ID | `exp064_modal_dabe_tokae_tinystories_t4_30m_long_003` |
+| Runtime hardening | `HF_HUB_DISABLE_XET=1` in Modal bootstrap |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false` |
+| Launch contract | `experiments/modal_launches/20260617_124600_exp064_modal_dabe_tokae_tinystories_t4_30m_long_003.json` |
+| Early status | passed dataset load and Trainer startup; `ephemeral (detached)`, `Tasks=1`; volume contains `config.yaml` and `logs/` |
+
+### Attempt 3 Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| run state | `stopped` at 2026-06-17 13:56:13 +01:00 | completes or checkpoints under cap | Yes |
+| stable / nan_batches | `true` / `0` | `true` / `0` | Yes |
+| val_loss_first -> val_loss_last | `10.81507 -> 4.05674` | downward trend | Yes |
+| val_token_acc_last | `0.31902` | `>0.24013` | Yes |
+| val_token_top5_acc_last | `0.51597` | logged | Yes |
+| val_token_top10_acc_last | `0.59262` | logged | Yes |
+| val_exact_chunk_acc_last | `0.0` | report | N/A |
+| val_bit_density_last | `0.49036` | `0.35..0.65` | Yes |
+| pulled checkpoint | `experiments/modal_downloads/exp064_modal_dabe_tokae_tinystories_t4_30m_long_003/checkpoints/best-step-0008000.ckpt` | artifact saved | Yes |
+| ETA stdout/sys metrics | missing | present for long Modal runs | No |
+
+### Attempt 3 Observations
+- Attempt 3 is a valid model-quality result but not a clean systems-observability run because the tokenizer-autoencoder path did not instantiate `EtaMetricsCallback`.
+- `val/token_acc` improved by `+0.07889` absolute over EXP-063 while preserving balanced binary density, so the longer optimization budget produced a clear reconstruction signal.
+- Attempt 4 patches `src/training/dabe_tokenizer_autoencoder.py` to reuse `EtaMetricsCallback` and sets Modal defaults `eta_stdout=true`, `eta_log_interval_steps=100`.
+
+### Attempt 4 Launch Plan
+| Field | Value |
+|------|-------|
+| Run ID | `exp064_modal_dabe_tokae_tinystories_t4_30m_long_004` |
+| Purpose | Repeat Attempt 3 with ETA stdout and `sys/steps_per_sec_live` / `sys/eta_seconds` metrics enabled |
+| Overrides | same as Attempt 3; Modal runtime additionally applies `dabe_tokenizer.training.eta_stdout=true dabe_tokenizer.training.eta_log_interval_steps=100` |
+
+### Attempt 4 Launch Details
+| Field | Value |
+|------|-------|
+| App ID | `ap-21DQLLzLOv3hbZKtBwTQSp` |
+| Run ID | `exp064_modal_dabe_tokae_tinystories_t4_30m_long_004` |
+| Launch contract | `experiments/modal_launches/20260617_125945_exp064_modal_dabe_tokae_tinystories_t4_30m_long_004.json` |
+| Early ETA evidence | `[eta] step=100/12000 sps=20.61 eta_min=9.6`; `[eta] step=600/12000 sps=21.35 eta_min=8.9` |
+| Early status | `ephemeral (detached)`, `Tasks=1`; training loop active |
+
+### Attempt 4 Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| run state | `stopped` at 2026-06-17 14:11:04 +01:00 | completes or checkpoints under cap | Yes |
+| stable / nan_batches | `true` / `0` | `true` / `0` | Yes |
+| val_loss_first -> val_loss_last | `10.81507 -> 4.05674` | downward trend | Yes |
+| val_token_acc_last | `0.31902` | `>0.24013` | Yes |
+| val_token_top5_acc_last | `0.51597` | logged | Yes |
+| val_token_top10_acc_last | `0.59262` | logged | Yes |
+| val_exact_chunk_acc_last | `0.0` | report | N/A |
+| val_bit_density_last | `0.49036` | `0.35..0.65` | Yes |
+| ETA/sys metric rows | `120` (`step=100..12000`) | present | Yes |
+| steps_per_sec_live final | `20.7441` | report | N/A |
+| pulled checkpoint | `experiments/modal_downloads/exp064_modal_dabe_tokae_tinystories_t4_30m_long_004/checkpoints/best-step-0008000.ckpt` | artifact saved | Yes |
+
+### Attempt 4 Observations
+- ETA logging is now wired correctly for tokenizer-autoencoder runs: Modal stdout emitted `[eta]` lines and CSV logging captured `sys/steps_per_sec_live` / `sys/eta_seconds`.
+- Attempt 4 is deterministic with Attempt 3 under the same seed/config, matching final reconstruction metrics while adding the missing observability channel.
+- The longer run improves top-1 token reconstruction from EXP-063 (`0.24013`) to `0.31902`, but exact 64-token chunk reconstruction remains `0.0`; next architecture work should target sequence-level decoding fidelity rather than only per-token accuracy.
+
+### Status: [COMPLETE]
+
+## EXP-063: Modal TinyStories DABE Tokenizer Autoencoder (T4 30m Cap)
+
+**Date:** 2026-06-17
+**Hypothesis:** A fixed-width DABE chunk tokenizer autoencoder trained on real TinyStories chunks for a capped 30-minute T4 run will remain stable and produce an initial reconstruction-learning signal beyond the synthetic EXP-062 contract smoke.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides (`dataset_name=roneneldan/TinyStories`, T4, `bf16-mixed`, 30-minute function timeout), `scripts/modal_dabe_tokenizer_autoencoder.py` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached Modal launch succeeds on `qrk-labs`.
+- Hard runtime cap is enforced by Modal function timeout `1800s`.
+- Run writes config, `stage_result.json`, `pipeline_summary.json`, logs, and at least one checkpoint to the Modal volume.
+- Training remains stable (`nan_batches=0`) if it completes before timeout.
+- Reconstruction metrics include `val/loss`, `val/token_acc`, `val/exact_chunk_acc`, and `val/bit_density`.
+
+### Decisions
+- [x] Use the EXP-062 fixed-width codec unchanged (`64` BPE tokens -> `256` bits, `4.0` bits/token).
+- [x] Run on TinyStories rather than synthetic text.
+- [x] Use Modal T4 with a 30-minute hard cap.
+- [x] Launch detached run and capture app ID + launch contract.
+- [x] Pull summary/checkpoint after completion or timeout.
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-PCuH5SeGfFt9KUeEyTaRQh` |
+| Run ID | `exp063_modal_dabe_tokae_tinystories_t4_30m_001` |
+| Config | `dabe_tokenizer_autoencoder_smoke` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | `T4` |
+| Timeout | `1800s` |
+| Overrides | `dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=2000 dabe_tokenizer.training.val_check_interval=100 dabe_tokenizer.training.checkpoint_every_n_train_steps=500 dabe_tokenizer.training.batch_size=16 dabe_tokenizer.training.enable_progress_bar=false` |
+| Launch contract | `experiments/modal_launches/20260617_114537_exp063_modal_dabe_tokae_tinystories_t4_30m_001.json` |
+| Early status | `ephemeral (detached)`, `Tasks=1` |
+| Pulled artifact dir | `experiments/modal_downloads/exp063_modal_dabe_tokae_tinystories_t4_30m_001/` |
+| Pulled checkpoint | `experiments/modal_downloads/exp063_modal_dabe_tokae_tinystories_t4_30m_001/best-step-0002000.ckpt` |
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| run state | `stopped` (`2026-06-17 12:48:31 +01:00`) | detached completion or timeout | Yes |
+| wall-clock app lifetime | `~3m18s` | `<=30m` | Yes |
+| status payload | `ok` | `ok` | Yes |
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| train_chunks / val_chunks | `11269 / 1351` | nonzero | Yes |
+| chunk size / code bits | `64 / 256` | fixed-width pilot | Yes |
+| bits_per_token | `4.0` | report | N/A |
+| val_loss_first -> last | `10.81498 -> 4.66566` | downward trend | Yes |
+| val_token_acc_last | `0.24013` | first reconstruction signal | Yes |
+| val_exact_chunk_acc_last | `0.0` | report | N/A |
+| val_bit_density_last | `0.48271` | near balanced | Yes |
+| best checkpoint | `best-step-0002000.ckpt` | present | Yes |
+
+### Key Observations
+- The tokenizer-first architecture produced a clear reconstruction-learning signal on real TinyStories within a short T4 run: validation CE fell by `~56.9%` and token accuracy reached `24.0%`.
+- Exact full-chunk reconstruction is still `0.0`, which is expected for early fixed-width training over 64-token chunks.
+- Bit density stayed near balanced (`0.4827`), so the straight-through binary bottleneck is not trivially saturating all-on or all-off.
+- The run completed before the 30-minute cap, so the next confirmation can increase data/steps or add richer reconstruction metrics rather than spending budget on timeout plumbing.
+
+### Decisions
+- [x] Treat EXP-063 as the first positive signal for the tokenizer-first pivot.
+- [ ] Add top-k token accuracy, decoded chunk samples, and per-position accuracy before scaling further.
+- [ ] Run a longer confirmation sweep over `code_bits in {128,256,512}` once metrics are richer.
+
+### Status: [COMPLETE]
+
+## EXP-062: DABE Tokenizer Autoencoder Pivot
+
+**Date:** 2026-06-17
+**Hypothesis:** Training DABE as a reconstruction-first chunk tokenizer/codec before LM finetuning will avoid the scalar inversion bottleneck seen in EXP-058 and provide a cleaner path to adapting existing models to compressed DABE tokens.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml`, `src/training/dabe_tokenizer_autoencoder.py`, `scripts/run_dabe_tokenizer_autoencoder.py` (commit: working tree)
+**WandB:** N/A (local smoke artifacts planned under `experiments/`)
+**Paper Section:** 3 (Method), 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Implement a chunk tokenizer autoencoder with a fixed-width binary bottleneck and per-position token reconstruction.
+- Validate dummy forward shapes: logits `(B, C, V)`, bits `(B, K)`, and finite loss.
+- Add Hydra smoke config and runner with config snapshot + results artifact.
+- Add unit tests for shape checks, gradient flow, and compression accounting.
+- Run the focused test suite locally before any larger training.
+
+### Decisions
+- [x] Pivot from scalar LM-first experiments to tokenizer-first reconstruction training.
+- [x] Keep this pilot fixed-width (`K=256` bits per `C=64` token chunk) before adding density routing.
+- [x] Implement tokenizer autoencoder module, runner, config, and tests.
+- [x] Run local smoke tests and record results.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| focused tests | `4 passed` (`tests/test_dabe_tokenizer_autoencoder.py`) | pass | Yes |
+| py_compile | module + runner pass | pass | Yes |
+| smoke run | `dabe_tokenizer_autoencoder_smoke_20260617_120846` | completes | Yes |
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| train_chunks / val_chunks | `160 / 40` | nonzero | Yes |
+| chunk size / code bits | `64 / 256` | fixed-width pilot | Yes |
+| bits_per_token | `4.0` | report | N/A |
+| val_loss_first -> last | `10.82584 -> 10.77883` | finite + non-worsening smoke | Yes |
+| val_token_acc_last | `0.0` | report only for 5-step smoke | N/A |
+| val_bit_density_last | `0.50547` | near balanced | Yes |
+| best checkpoint | `experiments/dabe_tokenizer_autoencoder_smoke_20260617_120846/checkpoints/best-step-0000005.ckpt` | present | Yes |
+
+### Key Observations
+- The tokenizer-first architecture now has an executable contract: BPE token chunks -> fixed binary code -> per-position token logits.
+- The smoke config uses deterministic synthetic text by default to avoid dataset-streaming latency during contract tests; real TinyStories can be restored by overriding `dabe_tokenizer.dataset.dataset_name`.
+- Five steps is only a wiring/shape/stability check. Reconstruction quality remains untested at meaningful budget.
+
+### Decisions
+- [x] Treat EXP-062 as M1/M2 scaffold for a learned DABE tokenizer, not as a quality claim.
+- [ ] Run a real TinyStories tokenizer training budget and add reconstruction metrics beyond token accuracy, including top-k token accuracy and decoded sample inspection.
+- [ ] Add variable-width/LFQ code routing after fixed-width reconstruction shows signal.
+
+### Status: [COMPLETE]
+
+## EXP-058: Multi-Scalar Chunk Compression (K=8) Pilot
+
+**Date:** 2026-06-17
+**Hypothesis:** Replacing the single float16 scalar per chunk with 8 sub-chunk scalars (sub-chunk split) will increase the per-chunk information capacity from ~16 bits to ~128 bits, improving decode reconstruction and downstream interaction quality while preserving training stability.
+**Config:** `configs/fp16_chunk_multi_scalar_k8_modal.yaml`, `configs/fp16_chunk_multi_scalar_k8_smoke.yaml`, `src/training/fp16_chunk_feasibility.py`, `tests/test_fp16_chunk_feasibility.py` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Compressor produces deterministic `(num_chunks, 8)` arrays.
+- Dataset windows maintain `(seq_len, 8)` shapes.
+- Model forward accepts `(B, seq_len, 8)` and emits `(B, seq_len, 8)` predictions.
+- Training remains stable (`nan_batches=0`, finite losses).
+- Backward compatibility: `scalars_per_chunk=1` path produces identical behavior to pre-change baseline.
+- Flat-track smoke tests pass (local + hierarchical regression tests).
+- Modal run completes within 1h cap.
+
+### Decisions
+- [x] Implement sub-chunk scalar split in `FP16ChunkCompressor._chunk_to_scalars`.
+- [x] Add `scalars_per_chunk` parameter with default `1` for backward compatibility.
+- [x] Update `FP16ChunkSequenceDataset` to window 1D and 2D scalar streams.
+- [x] Update `ScalarTransformerLM` input/output projections to `nn.Linear(K, ...)`.
+- [x] Update `FP16ChunkLMModule` to auto-inject `num_scalars` from compression config.
+- [x] Update `RuntimeMetricsCallback` to avoid inflating throughput when `K>1`.
+- [x] Update interaction probe script to use Euclidean nearest-neighbor for K>1 vectors.
+- [x] Add smoke and modal configs for K=8.
+- [x] Write unit tests covering K=8 shapes, determinism, forward pass, and finite training step.
+- [x] Verify hierarchical regression tests pass unchanged.
+- [x] Launch Modal 1h-capped run with `fp16_chunk_multi_scalar_k8_modal.yaml`.
+- [x] Pull best checkpoint from Modal volume and run fixed-set interaction probe.
+- [x] Run fixed-set interaction probe on best checkpoint and compare against K=1 baseline (EXP-031).
+
+### Launch Details (EXP-058)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| Attempt 1 App ID | `ap-2HbEe6qsLUbB1B7x6quhfq` |
+| Attempt 1 Run ID | `exp058_modal_fp16_multi_scalar_k8_001` |
+| Attempt 1 GPU | `A10G` |
+| Attempt 1 Mode | blocking (foreground) — local CLI timed out, run interrupted |
+| Attempt 2 Run ID | `exp058_modal_fp16_multi_scalar_k8_002` |
+| Attempt 2 GPU | `T4` |
+| Attempt 2 Mode | detached (`--detach`) but blocking shell — aborted |
+| Attempt 3 Run ID | `exp058_modal_fp16_multi_scalar_k8_003` |
+| Attempt 3 GPU | `T4` |
+| Attempt 3 Mode | detached (`--detach`) + `nohup` background (`&`) |
+| Attempt 3 App ID | `ap-L1P8yAgTJqXCJ1zd5ZyDjN` |
+| Attempt 4 Run ID | `exp058_modal_fp16_multi_scalar_k8_004` |
+| Attempt 4 App ID | `ap-zmK6OA23OCyNMhBgSxvPO5` |
+| Attempt 4 Mode | detached via launcher script (local process timeout while remote app continued briefly) |
+| Attempt 4 Launch Contract | `experiments/modal_launches/20260617_093908_exp058_modal_fp16_multi_scalar_k8_004.json` |
+| Attempt 5 Run ID | `exp058_modal_fp16_multi_scalar_k8_005` |
+| Attempt 5 App ID | `ap-BlliHWl8oYbQ7tVyZEjnGq` |
+| Attempt 5 Mode | detached via `scripts/launch_modal_detached.py` (`scripts/modal_fp16_chunk.py::run_pipeline`) |
+| Attempt 5 Launch Contract | `experiments/modal_launches/20260617_091850_exp058_modal_fp16_multi_scalar_k8_005.json` |
+| Attempt 3 Cap | Native Modal `timeout=3600` on `run_pipeline` function |
+| Attempt 3 ETA | `eta_stdout=true` in config — live ETA to Modal stdout every 20 steps |
+| Config | `fp16_chunk_multi_scalar_k8_modal` |
+| Stages | `preprocess,train` |
+| Timeout | `3600s` (1h cap) |
+| Model params | `9.8M` (slightly larger due to K=8 input/output projections) |
+| Training signal | `bf16-mixed`, `max_steps=30518` |
+| Pulled checkpoint | `experiments/modal_downloads/exp058_modal_fp16_multi_scalar_k8_005/best-step-0030000.ckpt` |
+| Probe artifact | `experiments/modal_downloads/exp058_modal_fp16_multi_scalar_k8_005/interaction_probe_fixedset100.json` |
+
+### Results
+| Metric | Value | Reference / Target | Pass |
+|--------|-------|--------------------|------|
+| run state | `stopped` (`2026-06-17 10:37:02 +01:00`) | detached completion | Yes |
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first -> last | `0.04811 -> 0.00996` | downward trend | Yes |
+| val_diffusion_loss_last | `0.03266` | report | N/A |
+| val_gist_cosine_last | `0.99930` | report | N/A |
+| val_gist_retrieval_top1_last | `0.00199` | report | N/A |
+| steps_per_sec | `28.36` | report | N/A |
+| raw_tokens_per_sec | `927,901.61` | report | N/A |
+| best checkpoint | `best-step-0030000.ckpt` | present | Yes |
+| fixed-set coherent_rate | `0.27` (`27/100`) | improve toward EXP-031 (`0.90`) | No |
+| fixed-set strict_coherent_rate | `0.17` (`17/100`) | improve toward EXP-031 (`0.44`) | No |
+| fixed-set dominant_continuation_share | `0.72` | low preferred | No |
+| fixed-set unique_continuations | `10` | high preferred | Mixed |
+| fixed-set mojibake_rows | `11` | `0` preferred | No |
+| fixed-set strict_gate_pass | `false` | `true` | No |
+
+### Key Observations
+- K=8 training remained stable and produced strong scalar/diffusion validation metrics, but fixed-set behavior did not clear the strict quality gate.
+- Compared with the K=1 EXP-031 fixed-set reference, K=8 reduced mojibake incidence (`11` vs `49`) but substantially regressed coherence (`0.27/0.17` vs `0.90/0.44`) and collapsed toward a dominant continuation (`0.72` share).
+- The first local probe attempt exposed a K>1 probe fallback bug for prompts with zero full compressed chunks; `scripts/run_fp16_interaction_probe.py` now constructs the compressor with `scalars_per_chunk` and pads empty K>1 prompts with the correct shape.
+
+### Decisions
+- [x] Keep K=8 as an informative negative/mixed result rather than a quality-improving replacement for EXP-031.
+- [x] Add regression coverage for empty-prompt K>1 interaction probing (`tests/test_interaction_probe_metrics.py`).
+- [ ] Decide whether to test larger K or move directly to learned LFQ/chunk encoder.
+
+### Status: [COMPLETE]
+
+## Further Research Notes
+
+- **Router reliability for multi-resolution token windows (post-token-window study):**
+  - Investigate abstention-first hierarchical routing (`64 -> 8 -> 1`) with confidence calibration.
+  - Penalize false-coarse routing more heavily than over-escalation.
+  - Add verifier-gated escalation before action for precision-critical outputs (code/commands/numerics/API args).
+
+## EXP-046: Mirror-Tier Decoder + Eval-Leak Guardrails (No-Modal Preflight)
+
+**Date:** 2026-06-15
+**Hypothesis:** Adding a mirror-tier decoder path (coarse/mid/fine) and making non-memory decoding the default probe mode will expose true generalization quality and prevent train/eval leakage from masking overfitting.
+**Config:** `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml`, `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml`, `src/training/fp16_hierarchical_feasibility.py`, `scripts/run_fp16_hierarchical_interaction_probe.py`, `tests/test_fp16_hierarchical_feasibility.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Mirror-tier decode losses are available as explicit training terms.
+- Probe default decode path does not rely on train-memory lookup.
+- Memory-lookup decode is explicitly gated and labeled in probe outputs.
+- Unit tests pass for mirror decode path, dataset tier targets, and finite forward/loss behavior.
+
+### Decisions
+- [x] Add optional mirror-tier decode heads/losses to hierarchical training module.
+- [x] Add model-side token decode helper from hidden state (`decode_chunk_ids_from_hidden`).
+- [x] Set probe default decode mode to `mirror_decoder`.
+- [x] Require explicit opt-in (`--allow-memory-lookup`) for memory lookup mode.
+- [x] Add probe payload fields for decode provenance (`decode_mode`, `uses_train_memory_lookup`).
+- [x] Run local compile/tests only; do not launch Modal run yet.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| `py_compile` (module + probe) | pass | pass | Yes |
+| Hierarchical feasibility tests | `4 passed` | pass | Yes |
+| Probe default mode | `mirror_decoder` | non-memory default | Yes |
+| Memory lookup guardrail | explicit flag required | guardrail present | Yes |
+| Modal execution | not launched (by request) | no launch | Yes |
+
+### Key Observations
+- Mirror decoding now supports no-memory generation/evaluation path, reducing leakage risk in interaction probes.
+- Previous memory-lookup path is preserved only as an explicit diagnostic mode.
+- This entry covers implementation correctness only; training/quality impact is pending org-account run.
+
+### Status: [COMPLETE]
+
+## EXP-057: Modal Hierarchical 64/8/1 Replay at 2M-Unique / 1B-Processed (Single-Token Decode Path)
+
+**Date:** 2026-06-16
+**Hypothesis:** Disabling hierarchical decode mirror heads and training only the base scalar + diffusion objectives (fine tier remains `1` token) will improve behavioral signal quality by removing decode-mirror coupling while preserving throughput/stability at the same `2M/1B` budget.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_t4.yaml` + overrides (`max_steps=30518`, `decode_mirror.enabled=false`) (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached launch succeeds on `qrk-labs`.
+- Training remains stable (`nan_batches=0`, no non-finite loss).
+- Validation loss trend remains downward across run.
+- Throughput remains near prior Modal hierarchical replay.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| checkpoint availability | artifacts |
+
+### Decisions
+- [x] Keep hierarchical encoder/router (`64/8/1`) unchanged.
+- [x] Disable decode mirror hierarchy for this run (`fp16_chunk.decode_mirror.enabled=false`).
+- [x] Keep budget at `2M unique / 1B processed` (`max_steps=30518`).
+- [x] Launch detached Modal run and record launch contract.
+- [x] Compare quality/throughput against EXP-056.
+
+### Status: [COMPLETE]
+
+### Launch Details (EXP-057)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-QmfKbnSWvHXnGgNkRUX9fG` |
+| Run ID | `exp057_modal_hier_2m1b_singledecode_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_t4` |
+| Overrides | `fp16_chunk.training.max_steps=30518 fp16_chunk.training.val_check_interval=1000 fp16_chunk.training.checkpoint_every_n_train_steps=2000 fp16_chunk.decode_mirror.enabled=false fp16_chunk.training.precision=16-mixed` |
+| Early throughput | `step=200`, `sps≈21.34`, `eta≈23.7 min` |
+| Launch contract | `experiments/modal_launches/20260616_0103_exp057_modal_hier_2m1b_singledecode_001.json` |
+
+### Results
+| Metric | EXP-057 | EXP-056 | Delta |
+|--------|---------|---------|-------|
+| stable | `true` | `true` | — |
+| nan_batches | `0` | `0` | — |
+| val_loss_first | `0.04688` | `1.13114` | lower |
+| val_loss_last | `0.00841` | `0.92662` | lower |
+| val_trend_pass | `true` | `true` | — |
+| val_diffusion_loss_last | `0.03259` | `0.03158` | slightly higher |
+| steps_per_sec | `23.74` | `18.57` | `+27.8%` |
+| raw_tokens_per_sec | `777,825.97` | `608,415.08` | `+27.8%` |
+| route usage (c/m/f) | `0.5765 / 0.2839 / 0.1396` | `0.5682 / 0.2778 / 0.1540` | less fine-route share |
+| best checkpoint | `best-step-0030000.ckpt` | `best-step-0030000.ckpt` | parity |
+| fixed-set probe coherent/strict | `0.97 / 0.88`* | `0.00 / 0.00` | higher* |
+| fixed-set probe dominant share | `0.05`* | `0.03` | slightly higher* |
+| fixed-set probe avg latency | `15.45 ms`* | `64.46 ms` | faster* |
+
+\* EXP-057 probe used `memory_lookup` mode (`--allow-memory-lookup`) because `decode_mirror` was disabled, so this behavioral result is diagnostic and not directly comparable to no-memory mirror-decoder probing.
+
+### Key Observations
+- Systems outcome is strong: EXP-057 improved throughput materially while staying stable over the full 2M/1B budget.
+- Dropping decode mirror removed `next_token` supervision metrics by design (`val_next_token_* = null`), so training signal is now purely scalar + diffusion + routing balance.
+- Behavioral probing requires either memory lookup (leak-prone diagnostic) or re-enabling a no-memory decode head; with decode mirror off, clean interaction evaluation path is not currently available.
+
+## EXP-047: Mirror-Decoder Hierarchical Modal Validation (2h-Capped, qrk-labs)
+
+**Date:** 2026-06-15
+**Hypothesis:** With mirror-tier decode enabled and eval-leak guardrails in place, a capped Modal run should remain stable and provide early quality/stability signal without train-memory decode dependence.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml` + overrides for capped budget (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Launch uses Modal profile `qrk-labs`.
+- Detached run starts cleanly and writes artifacts to `dabe-experiments` volume.
+- Runtime remains stable (`nan_batches=0`, no collapse markers in metrics/logs).
+- Run is hard-capped at 2 hours (timeout/autostop policy).
+
+### Decisions
+- [x] Record pre-run protocol entry before execution.
+- [x] Launch detached run with explicit profile + run id.
+- [x] Enforce 2h cap policy via scheduled app stop at +2h.
+- [x] Collect resulting summary artifacts.
+- [x] Record final metrics + pass/fail update.
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| Attempt 1 App ID | `ap-MUUUvRrcsQUMiT9kU3sEOJ` |
+| Attempt 1 Run ID | `exp047_modal_fp16_hier_mirror_2hcap_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_saturation_v2` |
+| Attempt 1 Overrides | `fp16_chunk.training.max_steps=9000 fp16_chunk.training.val_check_interval=1000` |
+| Attempt 1 Outcome | failed early with CUDA OOM during mirror loss (`smooth_l1_loss`) |
+| Attempt 2 App ID | `ap-ervllRez3jVxFrEhNvhQdN` |
+| Attempt 2 Run ID | `exp047_modal_fp16_hier_mirror_2hcap_002` |
+| Attempt 2 Overrides | `fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500` |
+| Attempt 2 Autostop | local scheduled stop pid `57097` at +2h (`/tmp/exp047_autostop_002.log`) |
+| Attempt 2 Early ETA | step 1600/4000, `sps~3.29`, `eta_min~12.2` |
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first -> last | `0.11676 -> 0.04118` | downward trend | Yes |
+| val_trend_pass | `true` | `true` | Yes |
+| val_diffusion_loss_last | `0.08926` | report | N/A |
+| val_gist_cosine_last | `0.96958` | report | N/A |
+| val_gist_retrieval_top1_last | `0.000273` | report | N/A |
+| route usage (coarse/mid/fine) | `0.5387 / 0.3088 / 0.1525` | non-collapsed | Yes |
+| gate_pass | `true` | `true` | Yes |
+| fixed-set probe coherent/strict (100) | `0.00 / 0.00` | non-collapsed quality | No |
+| fixed-set probe dominant continuation share | `0.83` | low dominance | No |
+| fixed-set probe rubric_avg_score | `2.76` | improve vs collapse baseline | No |
+
+### Key Observations
+- Training-side scalar/diffusion validation looked healthy and passed configured gate.
+- Interaction validation on mirror-decoder path failed badly (high dominant continuation share, zero strict coherence), indicating a train/eval objective mismatch remains.
+- This run is a stability/throughput success but **not** a usable interaction-quality checkpoint.
+
+### Status: [COMPLETE]
+
+## EXP-048: Hierarchical Inference Harness (Mirror-First, Fast/Quality Modes)
+
+**Date:** 2026-06-15
+**Hypothesis:** A standalone hierarchical inference harness with `mirror_decoder` default, debug-gated `memory_lookup`, and `quality/fast` runtime modes will provide reproducible generation and serving-speed diagnostics without reintroducing eval leakage.
+**Config:** `configs/fp16_hierarchical_inference.yaml`, `scripts/run_fp16_hierarchical_generate.py`, `src/inference/hierarchical_generation.py`, `tests/test_hierarchical_generation.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Default decode mode is `mirror_decoder` (no train-memory lookup).
+- `memory_lookup` remains available only with explicit opt-in.
+- Runner supports prompt batches and writes structured inference artifacts.
+- Runtime modes `quality` and `fast` are both available and logged in outputs.
+- Unit tests validate decode-path behavior and fast-mode cache behavior.
+
+### Decisions
+- [x] Log protocol entry before implementation.
+- [x] Implement reusable hierarchical generation utility module.
+- [x] Add standalone inference runner script + config.
+- [x] Add tests and run local test pass.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| Default decode mode | `mirror_decoder` | mirror-first | Yes |
+| Memory lookup guardrail | `--allow-memory-lookup` required | explicit opt-in | Yes |
+| Runtime modes | `quality`, `fast` | both available | Yes |
+| Structured output | JSON artifact with latency/tokens/s/collapse fields | present | Yes |
+| Local compile check | `py_compile` pass | pass | Yes |
+| Unit tests | `6 passed` (`test_hierarchical_generation` + hierarchical feasibility tests) | pass | Yes |
+
+### Key Observations
+- Fast mode uses cached chunk decode with bounded token refinement (`fast_decode_interval`, `fast_refine_tokens`) to trade quality for throughput deterministically.
+- Mirror decoder remains the default inference path, preserving the eval-leak fix from EXP-046.
+- Memory lookup remains available as a clearly-labeled diagnostic path only.
+
+### Status: [COMPLETE]
+
+## EXP-049: Next-Token Supervision Patch for Mirror Decoder (Train/Eval Alignment)
+
+**Date:** 2026-06-15
+**Hypothesis:** Adding a direct next-token supervision term (sampled full-vocab CE over next-chunk positions) and tracking `val/next_token_acc` will align training signal with interaction quality and prevent surrogate-loss-only checkpoint selection.
+**Config:** `src/training/fp16_hierarchical_feasibility.py`, `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml`, `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml`, `tests/test_fp16_hierarchical_feasibility.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Training loop includes optional direct token-level next-step supervision (`decode_mirror.next_token_supervision`).
+- Validation logs expose token-level quality metric (`val/next_token_acc`) alongside scalar/diffusion metrics.
+- Checkpoint monitor is configurable to prefer direct token metric over surrogate scalar loss.
+- Local tests pass for new supervision path.
+
+### Decisions
+- [x] Add sampled next-token CE + accuracy metric in mirror decode path.
+- [x] Add configurable checkpoint monitor/mode (`training.checkpoint_monitor`, `training.checkpoint_mode`).
+- [x] Enable next-token supervision + token-accuracy checkpointing in saturation-v2 config.
+- [x] Add unit-test coverage and run local tests.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| Next-token supervision path | implemented (`next_token_supervision`) | present | Yes |
+| Validation token metric | `val/next_token_acc` + `val/next_token_ce` | present | Yes |
+| Checkpoint monitor configurability | implemented | present | Yes |
+| Saturation-v2 monitor | `val/next_token_acc` (`max`) | token-quality-first | Yes |
+| Local tests | `6 passed` (`test_fp16_hierarchical_feasibility` + `test_hierarchical_generation`) | pass | Yes |
+
+### Key Observations
+- This patch fixes the objective mismatch at training-time signal level; it does not retroactively fix prior checkpoints.
+- Next run should be judged primarily by `val/next_token_acc` and fixed-set interaction probe, not scalar loss alone.
+
+### Status: [COMPLETE]
+
+## EXP-050: Hierarchical Mirror Decoder Rerun with Last Stable Params (Post-Alignment Patch)
+
+**Date:** 2026-06-15
+**Hypothesis:** Re-running the same stable training budget as EXP-047 attempt 2 (`batch_size=256`, `max_steps=4000`, `val_check_interval=500`) after adding next-token supervision should preserve stability while improving token-level validation signal and downstream interaction quality.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml` + overrides (`fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500`) (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached launch succeeds on `qrk-labs`.
+- Training remains stable (`nan_batches=0`).
+- `val/next_token_acc` is logged and checkpointing monitors it.
+- Fixed-set interaction probe improves versus EXP-047.
+
+### Decisions
+- [x] Record pre-run protocol entry before launch.
+- [x] Launch detached run with EXP-047 attempt-2 params.
+- [x] Capture app/run identifiers and update log.
+- [x] Run validation probe after completion.
+
+### Launch Details
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-IFfqLdVdIXwxIqKzJfMJvI` |
+| Run ID | `exp050_modal_fp16_hier_mirror_nexttok_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_saturation_v2` |
+| Overrides | `fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500` |
+| Early status | started cleanly (AMP on CUDA, training loop initialized) |
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first -> last | `1.1860 -> 1.0665` | downward trend | Yes |
+| val_next_token_acc_last | `0.0752` | logged + checkpointed | Yes |
+| val_next_token_ce_last | `10.1463` | report | N/A |
+| fixed-set coherent/strict (100) | `0.00 / 0.00` | improve vs EXP-047 | No |
+| dominant continuation share | `1.00` | lower than EXP-047 (`0.83`) | No |
+| unique continuations | `1` | higher diversity | No |
+| rubric_avg_score | `3.52` | improve quality | Mixed |
+
+### Key Observations
+- Train-side metrics and token-level supervision were present and stable, but interaction quality still collapsed under mirror decoding.
+- Compared to EXP-047, rubric relevance improved slightly but output diversity/coherence worsened (single dominant continuation).
+- This confirms the mismatch is not solved by loss instrumentation alone; decode objective/capacity likely needs further redesign.
+
+### Status: [COMPLETE]
+
+## EXP-039: OpenRouter LLM Judge Integration (Chunked DeepSeek-V4-Flash-Free)
+
+**Date:** 2026-06-14
+**Hypothesis:** Adding an OpenRouter-backed LLM judge (`deepseek-v4-flash:free`) with chunked request batching and retry/backoff will provide more robust interaction-quality signal without triggering rate-limit failures.
+**Config:** `scripts/run_fp16_interaction_probe.py` (OpenRouter judge mode + chunking), `tests/test_interaction_probe_metrics.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- OpenRouter judge mode runs with `deepseek-v4-flash:free`.
+- Generated rows are judged in bounded chunks (configurable) instead of one-row-per-request.
+- Rate-limit handling includes retries with backoff.
+- Output artifacts include run-level LLM-judge aggregate metrics and per-row judge fields.
+- Unit tests cover key parsing/chunking/parsing behavior.
+
+### Decisions
+- [x] Implement optional OpenRouter judge path with opencode-config key resolution.
+- [x] Add chunked request pipeline + retry/backoff.
+- [x] Add tests and run them locally.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| OpenRouter judge mode flag | `--openrouter-judge` implemented | present | Yes |
+| Default judge model | `deepseek-v4-flash:free` | match requested model | Yes |
+| Chunked judging | `--judge-chunk-size` + chunked batching path | present | Yes |
+| Retry/backoff | `--judge-max-retries` + exponential backoff on retriable status codes | present | Yes |
+| Key resolution | env first, then opencode provider mapping | present | Yes |
+| Unit tests | `9 passed` (`tests/test_interaction_probe_metrics.py`) | pass | Yes |
+
+### Key Observations
+- The judge path is now opt-in, so legacy probe behavior is unchanged unless `--openrouter-judge` is enabled.
+- If OpenRouter key lookup fails, probe generation still completes and records `llm_judge_error` explicitly in output.
+- Chunking, retries, and per-row fallback protect long judge runs from hard-failing on transient rate limits or malformed judge JSON.
+
+### Status: [COMPLETE]
+
+## EXP-040: Cross-Run OpenRouter Judge Replay (Fixed 100 Prompt Set)
+
+**Date:** 2026-06-14
+**Hypothesis:** Replaying the fixed 100-prompt set with OpenRouter LLM judging across top checkpoints (`EXP-031`, `EXP-034`, `EXP-036`) will provide a stable cross-run quality ranking for paper tables beyond heuristic-only coherence.
+**Config:** `scripts/run_fp16_interaction_probe.py` with `--prompt-set-file research/eval/fixed_prompt_set_v1.jsonl --num-prompts 100 --openrouter-judge --judge-chunk-size 8` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- All three runs complete with fixed 100-prompt probe artifacts.
+- LLM judge path executes without full fallback (`llm_judge_fallback_rows << num_prompts`).
+- Generate one comparable summary table for `EXP-031/034/036`.
+
+### Decisions
+- [x] Run fixed-set OpenRouter probe for `EXP-031` best checkpoint.
+- [x] Run fixed-set OpenRouter probe for `EXP-034` best checkpoint.
+- [x] Run fixed-set OpenRouter probe for `EXP-036` best checkpoint.
+- [x] Produce cross-run summary table artifact.
+
+### Results
+| Run | Coherent | Strict | Mojibake Rows | Heuristic Rubric Avg | LLM Rubric Avg | LLM Pass Rate | LLM Fallback Rows |
+|-----|----------|--------|---------------|----------------------|----------------|---------------|-------------------|
+| `exp031_modal_fp16_2m3b_optfix_001` | `0.90` | `0.44` | `49` | `6.69` | `2.41` | `0.03` | `0` |
+| `exp034_modal_fp16_2m3b_sat_v2_001` | `0.93` | `0.07` | `75` | `6.17` | `2.07` | `0.00` | `0` |
+| `exp036_modal_fp16_2m32b_8gb_v2_001` | `0.96` | `0.00` | `100` | `5.86` | `1.23` | `0.00` | `0` |
+
+### Key Observations
+- All three runs completed with full OpenRouter judging (`13` requests/run, zero fallback rows in all runs).
+- Cross-run ranking by LLM rubric score is `EXP-031 > EXP-034 > EXP-036`.
+- Higher heuristic coherence does not imply better judged quality in this setup; `EXP-036` had the highest coherence but worst strict/LLM rubric outcomes.
+- Comparison artifacts were written to:
+  - `research/eval/openrouter_fixedset100_summary_exp031_exp034_exp036.csv`
+  - `research/eval/openrouter_fixedset100_summary_exp031_exp034_exp036.md`
+
+### Status: [COMPLETE]
+
+## EXP-041: Hierarchical 64/8/1 Routed FP16 Model (EXP-031-Seeded)
+
+**Date:** 2026-06-14
+**Hypothesis:** A hierarchical scalar model that fuses `64/8/1` token-window signals with deterministic routing can retain the training stability of `EXP-031` while reducing quality regression under longer exposure.
+**Config:** `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml` (planned), runner `scripts/run_fp16_hierarchical_feasibility.py` (planned), module `src/training/fp16_hierarchical_feasibility.py` (planned) (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 3 (Method), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Training completes with `stable=true` and `nan_batches=0`.
+- Validation trend is non-divergent (`val_loss_last <= val_loss_first` under configured gate).
+- Router usage remains non-collapsed (all three scales used above minimum share threshold).
+- Produce first fixed-set interaction probe artifact for this track.
+
+### Decisions
+- [x] Implement standalone hierarchical 64/8/1 module and runner.
+- [x] Seed config from `EXP-031`-relevant params (data budget + optimizer family + eval cadence).
+- [x] Execute a smoke run and record initial stability/trend/router metrics.
+- [ ] Launch full-budget run at EXP-031-equivalent step schedule.
+
+### Results (Smoke)
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first | `0.19576` | report | N/A |
+| val_loss_last | `0.11408` | `<= val_loss_first` | Yes |
+| val_trend_pass | `true` | `true` | Yes |
+| val_route_usage_coarse_last | `0.5512` | non-collapsed | Yes |
+| val_route_usage_mid_last | `0.2988` | non-collapsed | Yes |
+| val_route_usage_fine_last | `0.1500` | non-collapsed | Yes |
+| steps_per_sec | `10.09` | report | N/A |
+| raw_tokens_per_sec | `330,275` | report | N/A |
+| gate_pass | `true` | `true` | Yes |
+
+### Key Observations
+- 64/8/1 hierarchical fusion trained stably on first smoke pass with clear downward validation loss.
+- Router usage stayed close to configured target distribution (`~0.55/0.30/0.15`), indicating no immediate route collapse.
+- Run artifact: `experiments/fp16_hierarchical_64_8_1_smoke_20260614_205131/results.json`.
+
+### Status: [COMPLETE]
+
+## EXP-042: Hierarchical 64/8/1 Full-Budget Run + Interaction Probe
+
+**Date:** 2026-06-14
+**Hypothesis:** At EXP-031-equivalent budget, hierarchical `64/8/1` routing will preserve stability while improving strict/LLM-judge interaction quality relative to recent saturation regressions.
+**Config:** `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml` + runner `scripts/run_fp16_hierarchical_feasibility.py` + probe `scripts/run_fp16_hierarchical_interaction_probe.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Full training run completes (`stable=true`, `nan_batches=0`, trend non-divergent).
+- Router usage remains non-collapsed across coarse/mid/fine.
+- Fixed-set interaction probe artifact is produced and includes strict + LLM-judge metrics.
+
+### Decisions
+- [ ] Launch full-budget training run in background.
+- [ ] Run hierarchical interaction probe on best checkpoint after training.
+- [ ] Compare against EXP-031/034/036 in summary table.
+
+### Status: [RUNNING]
+
+## EXP-043: Modal T4 Hierarchical 64/8/1 Run (Optimized Launch Path)
+
+**Date:** 2026-06-14
+**Hypothesis:** Running the hierarchical 64/8/1 track on Modal `T4` with cache-aware runtime settings (`bf16`, tuned dataloader workers, HF cache volume, periodic volume commits) will improve wall-clock practicality versus local MPS while keeping training stable.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_t4.yaml`, launcher `scripts/modal_fp16_hierarchical.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Systems Analysis)
+
+### Success Criteria
+- Detached Modal launch succeeds and returns app/run contract.
+- Run artifact is written under shared experiments volume with checkpoints and `stage_result.json`.
+- Training is stable (`nan_batches=0`) with non-collapsed route usage.
+
+### Decisions
+- [x] Add dedicated Modal launcher for hierarchical track on `T4`.
+- [x] Launch detached full run on Modal with explicit run id.
+- [x] Run fixed-set interaction probe on resulting best checkpoint.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| run_id | `exp043_modal_fp16_hierarchical_t4_opt_001` | recorded | Yes |
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first | `0.0304653` | report | N/A |
+| val_loss_last | `0.00324867` | downward trend | Yes |
+| val_trend_pass | `true` | `true` | Yes |
+| best checkpoint | `best-step-0090000.ckpt` | saved | Yes |
+| route usage (coarse/mid/fine) | `0.5467 / 0.3017 / 0.1517` | non-collapsed | Yes |
+| steps_per_sec | `25.73` | improve practicality | Yes |
+| raw_tokens_per_sec | `842,953` | improve practicality | Yes |
+| probe coherent_rate (50 fixed prompts) | `0.96` | report | N/A |
+| probe strict_coherent_rate (50 fixed prompts) | `0.88` | report | N/A |
+| probe rubric_avg_score (heuristic) | `7.78` | report | N/A |
+| probe llm_rubric_avg_score (DeepSeek-v4-flash) | `2.26` | report | N/A |
+
+### Key Observations
+- Initial detached launch (`ap-E6Vj5879SJVsHffFjCdwql`) was stopped and replaced after runtime optimization patching.
+- Active training run completed on Modal app `ap-f0GQFRJLsdUZNJrKXp8RvQ` and is now stopped.
+- Optimization patch (skipping train-time gist retrieval + live ETA logs) materially improved throughput and observability.
+- Routing remained close to target distribution throughout and did not collapse.
+- Interaction probe shows strong heuristic quality but low LLM-judge rubric signal, matching prior pattern that strict semantic quality remains the bottleneck.
+- Fixed-set 100-prompt probe (`interaction_probe_fixedset100_openrouter.json`) completed with full judge coverage (`13` requests, `0` fallback rows): `coherent_rate=0.98`, `strict_coherent_rate=0.92`, heuristic `rubric_avg_score=7.85`, but LLM-judge `llm_rubric_avg_score=2.12` and `llm_rubric_pass_rate=0.05`.
+
+### Status: [COMPLETE]
+
+## EXP-044: Hierarchical 64/8/1 Throughput Saturation Run (Modal)
+
+**Date:** 2026-06-14
+**Hypothesis:** Increasing model width/depth, compressed context length, and batch size on the hierarchical `64/8/1` architecture will saturate a single-GPU training path while preserving stability (`nan_batches=0`) and non-collapsed routing.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_saturation_v1.yaml`, launcher `scripts/modal_fp16_hierarchical.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Systems Analysis)
+
+### Success Criteria
+- Detached Modal launch succeeds and run artifacts are written.
+- Training remains stable (`stable=true`, `nan_batches=0`).
+- Route usage remains non-collapsed across coarse/mid/fine.
+- Throughput and GPU utilization signal improve versus `EXP-043`.
+
+### Decisions
+- [x] Add saturation-oriented config (larger model + larger batch + longer compressed context).
+- [x] Launch detached Modal run and monitor for OOM/instability.
+- [ ] Compare stability/quality/throughput deltas versus `EXP-043`.
+
+### Key Observations (In-Flight)
+- Detached app id: `ap-YClp5UQfXG7QrgcTEeySK8`.
+- Run id: `exp044_modal_fp16_hierarchical_sat_v1_001`.
+- Launch passed model init with `113M` trainable params and entered training loop.
+- First committed train point observed at `step=49` with finite losses (`stable=1.0`, no NaN signal).
+- Run was stopped after early ETA signal (`~85.8h`) due impractical wall-clock despite stable training.
+
+### Status: [ABANDONED]
+
+## EXP-045: Hierarchical Saturation v2 (Stability-First Throughput Patch)
+
+**Date:** 2026-06-14
+**Hypothesis:** A stability-first throughput patch on the saturation track (remove forced bf16 override, use `16-mixed` on T4, reduce diffusion latent width, and slightly lower LR) will materially improve wall-clock while preserving training stability.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml`, launcher `scripts/modal_fp16_hierarchical.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Systems Analysis)
+
+### Success Criteria
+- Detached launch succeeds with v2 config (effective precision = `16-mixed`).
+- Early ETA improves versus EXP-044 by a meaningful margin.
+- Stability remains intact (`nan_batches=0`, finite losses).
+
+### Decisions
+- [x] Stop EXP-044 run.
+- [x] Patch launcher to stop forcing `bf16-mixed`.
+- [x] Add saturation v2 config (`16-mixed`, lower LR, lighter diffusion latent).
+- [x] Launch detached EXP-045 run.
+- [x] Compare early ETA/stability versus EXP-044.
+
+### Key Observations (In-Flight)
+- Detached app id: `ap-N0zw4m1b3R5QJ7pRbH6EzC`.
+- Run id: `exp045_modal_fp16_hierarchical_sat_v2_001`.
+- Precision now correctly applied as `16-mixed` on T4.
+- Early ETA signal at step 200: `sps=1.52`, `eta_min=999.4` (~16.7h), vs EXP-044 early `sps=0.30`, `eta_min=5148.4` (~85.8h).
+- Approximate early speedup: ~`5.1x` with stability intact (`train/stable=1.0` on observed points).
+
+### Status: [RUNNING]
+
+## EXP-024: Freeze Best 64-Window Diffusion Baseline
+
+**Date:** 2026-06-13
+**Hypothesis:** Freezing a single canonical baseline from EXP-022 will reduce configuration drift and improve comparability for all forward experiments.
+**Config:** `configs/fp16_chunk_best64_frozen.yaml` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 5 (Results)
+
+### Decisions
+- [x] Freeze EXP-022 `64` diffusion gist run as canonical baseline.
+- [x] Add immutable baseline metadata artifact under `experiments/frozen_baselines/`.
+- [x] Require subsequent forward experiments to report deltas vs this frozen reference.
+
+### Status: [COMPLETE]
+
+## EXP-025: FP16 64-Window Token-Scale Run (More Tokens)
+
+**Date:** 2026-06-14
+**Hypothesis:** Increasing token budget (more train/val samples and steps) on the frozen 64-window diffusion family should improve or at least preserve semantic-gist metrics while remaining stable.
+**Config:** `configs/fp16_chunk_experimental_64.yaml` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run completes with `stable=true` and `nan_batches=0`.
+- Validation trend remains downward.
+- Compare deltas against frozen baseline `EXP-022` 64 run.
+
+### Results
+| Metric | Value | EXP-022 64 Baseline | Delta |
+|--------|-------|----------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.32073` | `0.31940` | `+0.00132` |
+| val_loss_last | `0.31888` | `0.31776` | `+0.00113` |
+| val_diffusion_loss_last | `1.27405` | `1.27006` | `+0.00399` |
+| val_gist_cosine_last | `0.03137` | `0.03566` | `-0.00429` |
+| val_gist_retrieval_top1_last | `0.00223` | `0.00316` | `-0.00093` |
+| steps_per_sec | `12.11` | `17.11` | `-5.00` |
+| raw_tokens_per_sec | `395,957.88` | `560,581.92` | `-164,624.04` |
+| trend_pass | `true` | `true` | same |
+
+### Key Observations
+- Training remained stable under higher token budget.
+- This specific scaled run did not improve gist metrics versus the frozen baseline.
+- Throughput dropped substantially due the heavier experimental setup.
+
+### Decisions
+- [x] Keep EXP-022 as frozen best baseline for forward comparisons.
+- [x] Record this as a negative-but-useful scaling result.
+- [ ] If scaling is revisited, run a controlled ablation (same architecture, only token budget changed).
+
+### Status: [COMPLETE]
+
+## EXP-027: FP16 64-Window 2M-Unique / 1B-Processed Scaling Run
+
+**Date:** 2026-06-14
+**Hypothesis:** Holding the frozen 64-window diffusion architecture fixed while constraining unique-token coverage (~2M raw-token-equivalent) and extending total processed token budget (~1B) will preserve stability and indicate whether repeated-exposure training improves validation signal under high-step schedules.
+**Config:** `configs/fp16_chunk_2m_unique_1b_total.yaml` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run completes with `stable=true` and `nan_batches=0`.
+- `train_chunks * 64` is approximately `~2M` unique raw-token-equivalent coverage.
+- Total processed raw tokens is approximately `~1B` (`max_steps * batch_size * compressed_seq_len * chunk_size_tokens`).
+- Validation trend remains non-divergent and comparable to frozen baseline family.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | run |
+| nan_batches | run |
+| train_chunks / val_chunks | run |
+| val_loss_first/last | run |
+| val_diffusion_loss_last | run |
+| val_gist_cosine_last | run |
+| val_gist_retrieval_top1_last | run |
+| steps_per_sec | run |
+| raw_tokens_per_sec | run |
+
+### Decisions
+- [x] Keep architecture/objective fixed to isolate token-budget scheduling effects.
+- [x] Set train sample budget to target `~2M` unique raw-token-equivalent coverage.
+- [x] Set step budget to target `~1B` total processed raw tokens.
+- [x] Execute run and compare against `EXP-024` frozen baseline and `EXP-026` large-unique run.
+
+### Results
+| Metric | Value | EXP-026 (100M-Unique) | Delta |
+|--------|-------|------------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.31765` | `0.31826` | `-0.00062` |
+| val_loss_last | `0.31721` | `0.31760` | `-0.00038` |
+| val_diffusion_loss_last | `1.26750` | `1.26915` | `-0.00165` |
+| val_gist_cosine_last | `0.03669` | `0.03638` | `+0.00032` |
+| val_gist_retrieval_top1_last | `0.00218` | `0.00210` | `+0.00008` |
+| steps_per_sec | `19.73` | `10.43` | `+9.30` |
+| raw_tokens_per_sec | `645,540.55` | `341,645.10` | `+303,895.45` |
+| cpu_util_avg | `48.29` | `73.11` | `-24.82` |
+| train_chunks | `29,855` | `1,678,912` | `-1,649,057` |
+| unique raw-token-equivalent | `1,910,720` | `107,450,368` | `-105,539,648` |
+| processed raw-token target | `1,000,013,824` | N/A | targeted |
+
+### Key Observations
+- Run completed stably with no NaN/collapse and passed the trend gate.
+- The constrained-unique/high-repeat schedule produced slightly better validation and gist metrics than the 100M-unique run in this setup.
+- Throughput improved dramatically versus the 100M-unique run while reducing CPU pressure, indicating better time-to-signal efficiency.
+- This supports the “epoch-performance” framing: repeated exposure over a smaller unique pool can be a faster optimization probe than maximizing unique coverage.
+
+### Status: [COMPLETE]
+
+## EXP-028: FP16 Modal Modular Pipeline v1 (Preprocess Cache + Train Stage)
+
+**Date:** 2026-06-14
+**Hypothesis:** Splitting FP16 chunk runs into stage-isolated Modal functions (`preprocess`, `train`) with volume-backed cached artifacts will reduce repeated startup/preprocessing waste and improve operational reliability for detached GPU runs.
+**Config:** `configs/fp16_chunk_modal_2m_unique_1b_total.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Systems Analysis)
+
+### Success Criteria
+- Modal code path exists with stage-isolated functions and class-based runner.
+- `preprocess` writes reusable cache artifacts and metadata to shared volume.
+- `train` consumes cache artifacts without re-tokenizing from raw text.
+- Pipeline writes stage summaries and aggregate run summary.
+- System signal: run completes detached with `stable=true`, `nan_batches=0`, and `raw_tokens_per_sec >= 600k`.
+- Learning signal: `val_loss_last <= val_loss_first` and quality metrics meet/beat local reference (`val_loss_last <= 0.3173`, `val_gist_cosine_last >= 0.036`, `val_gist_retrieval_top1_last >= 0.0021`).
+- Interaction-readiness signal (planned post-train probe): coherent continuation rate >=60% on a fixed 50-prompt held-out probe set.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | train stage |
+| nan_batches | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| val_gist_cosine_last | train stage |
+| val_gist_retrieval_top1_last | train stage |
+| preprocess_seconds | preprocess stage |
+| cache reuse validation | rerun train stage without preprocess |
+| interaction_probe.coherent_rate | post-train probe |
+| interaction_probe.avg_decode_latency_ms | post-train probe |
+
+### Decisions
+- [x] Implement dedicated module `src/training/modal_fp16_chunk_pipeline.py`.
+- [x] Implement dedicated script `scripts/modal_fp16_chunk.py`.
+- [x] Add Modal-oriented FP16 config and parsing tests.
+- [x] Lock explicit signal pack (system + learning + interaction-readiness) before launch.
+- [x] Execute first detached Modal run and record throughput/cost deltas.
+
+### Results
+| Signal | Metric | Target | Observed | Pass |
+|--------|--------|--------|----------|------|
+| System | detached run completion | complete without timeout/cancel | completed (`ap-DZgEgbIPu5HG7Qg4Au8Xzl`, stopped cleanly) | Yes |
+| System | stability | `stable=true`, `nan_batches=0` | `stable=true`, `nan_batches=0` | Yes |
+| System | throughput floor | `raw_tokens_per_sec >= 600k` | `1,638,251.98` | Yes |
+| Learning | trend | `val_loss_last <= val_loss_first` | `0.31798 > 0.31768` | No |
+| Learning | local reference loss | `val_loss_last <= 0.3173` | `0.31798` | No |
+| Learning | local reference gist cosine | `>= 0.036` | `0.03611` | Yes |
+| Learning | local reference gist retrieval@1 | `>= 0.0021` | `0.00174` | No |
+| Interaction-readiness | 50-prompt coherence probe | `>= 60%` coherent | `64.0%` (32/50, heuristic rubric) | Yes |
+| Interaction-readiness | avg decode latency | report | `16.29 ms/prompt` (2 chunk steps, local MPS replay) | N/A |
+
+### Key Observations
+- Modal systems performance is strong: preprocess finished quickly (`~6.89s`) and train throughput exceeded local runs by a large margin.
+- Unique/processed token targeting held: cached unique raw-token-equivalent `1,910,720` and processed target `1,000,013,824`.
+- Training quality peaked before final checkpoint: best validation (`step 27,999`) reached `val/loss=0.31682` and `val_gist_retrieval_top1=0.00203`, then regressed by the last eval (`step 29,999`).
+- This indicates schedule/early-stop sensitivity rather than outright instability.
+- Post-train interaction probe on `best-step-0028000.ckpt` passed the agreed readiness gate with `32/50` coherent continuations under a stricter anti-repetition heuristic; failures were mostly repetitive canned continuations.
+- Probe artifact: `experiments/modal_downloads/exp028_modal_fp16_2m1b_001/interaction_probe_50.json`.
+
+### Decisions
+- [x] Keep modal modular architecture (preprocess cache + train) as default high-horsepower path.
+- [x] Use best checkpoint (`best-step-0028000.ckpt`) as primary artifact for follow-up probes, not `last.ckpt`.
+- [x] Add post-train 50-prompt interaction-readiness probe and score coherence/latency.
+- [ ] Add train-only rerun-from-cache verification (skip preprocess) to explicitly close cache-reuse signal.
+
+### Status: [COMPLETE]
+
+## EXP-029: FP16 Modal 2M-Unique / 3B-Processed (More Epochs)
+
+**Date:** 2026-06-14
+**Hypothesis:** Increasing processed-token budget from ~1B to ~3B while keeping unique-token coverage fixed near ~2M will improve end-of-run validation and interaction readiness by giving the model more repeated optimization passes over the same latent support.
+**Config:** `configs/fp16_chunk_modal_2m_unique_3b_total.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Training Dynamics)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- End metrics improve vs EXP-028 final checkpoint (`val_loss_last`, `val_gist_retrieval_top1_last`).
+- Probe-ready best checkpoint is produced for post-train interaction evaluation.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| val_gist_cosine_last | train stage |
+| val_gist_retrieval_top1_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| best checkpoint step + value | metrics.csv + checkpoint callback |
+
+### Decisions
+- [x] Keep architecture/objective fixed; increase step budget only.
+- [x] Launch detached Modal run with shared preprocess/train modular pipeline.
+- [x] Run 50-prompt interaction probe on best checkpoint and compare to EXP-028.
+
+### Results
+| Metric | Value | EXP-028 (2M/1B) | Delta |
+|--------|-------|------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.3171909` | `0.3176839` | `-0.0004930` |
+| val_loss_last | `0.3171835` | `0.3179833` | `-0.0007998` |
+| val_trend_pass | `true` | `false` | improved |
+| val_diffusion_loss_last | `1.2676076` | `1.2708825` | `-0.0032749` |
+| val_gist_cosine_last | `0.0366144` | `0.0361075` | `+0.0005069` |
+| val_gist_retrieval_top1_last | `0.0017919` | `0.0017435` | `+0.0000484` |
+| steps_per_sec | `49.16` | `50.06` | `-0.91` |
+| raw_tokens_per_sec | `1,608,505.10` | `1,638,251.98` | `-29,746.87` |
+| processed_raw_tokens_target | `3,000,041,472` | `1,000,013,824` | `+2,000,027,648` |
+| cached_unique_raw_tokens_equivalent | `1,910,720` | `1,910,720` | same |
+| interaction_probe_50_coherent_rate | `0.06` (`3/50`) | `0.64` (`32/50`) | `-0.58` |
+| interaction_probe_50_avg_decode_latency_ms | `17.51` | `16.29` | `+1.22` |
+| gate_pass | `true` | `false` | improved |
+
+### Key Observations
+- Longer 2M-unique training (3B processed) completed cleanly and improved end-of-run loss metrics versus EXP-028.
+- Throughput remained high and nearly unchanged, so extra training time translated to better optimization signal without major systems regression.
+- Gist retrieval improved only marginally and remains below the earlier 0.0021 target.
+- Post-train interaction probe on `best-step-0072000.ckpt` failed readiness badly (`3/50` coherent), with strong mode collapse into repeated boilerplate continuations.
+- Probe artifact: `experiments/modal_downloads/exp029_modal_fp16_2m3b_001/interaction_probe_50.json`.
+
+### Decisions
+- [x] Keep EXP-029 as successful “more epochs on fixed unique pool” validation for scalar losses/throughput only.
+- [x] Run 50-prompt interaction probe on `best-step-0072000.ckpt`.
+- [x] Mark interaction-readiness as regressed vs EXP-028 despite better scalar metrics.
+- [x] Continue monitoring EXP-030 (20M/10B) for scaling behavior and failure-mode reduction.
+
+### Status: [COMPLETE]
+
+## EXP-030: FP16 Modal 20M-Unique / 10B-Processed (10x/10x Scale)
+
+**Date:** 2026-06-14
+**Hypothesis:** Scaling both unique-token coverage (~20M raw-token-equivalent) and processed-token budget (~10B) by 10x may reduce repetitive failure modes and improve interaction-readiness metrics while preserving high-throughput modular execution.
+**Config:** `configs/fp16_chunk_modal_20m_unique_10b_total.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Scaling Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- Cached unique-token target is near ~20M and processed-token target near ~10B.
+- Interaction probe coherence meets/exceeds EXP-028 gate (`>=60%`) with reduced repetition artifacts.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| cached_unique_raw_tokens_equivalent | train stage |
+| processed_raw_tokens_target | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_gist_cosine_last / val_gist_retrieval_top1_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| interaction_probe.coherent_rate | post-train probe |
+
+### Decisions
+- [x] Scale data and step budgets by 10x from EXP-028 baseline.
+- [x] Keep model architecture fixed for clean scaling interpretation.
+- [x] Launch detached Modal run regardless of EXP-029 outcome.
+- [ ] Run 50-prompt interaction probe on best checkpoint.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| cached_unique_raw_tokens_equivalent | `19,550,528` | near `~20M` | Yes |
+| processed_raw_tokens_target | `10,000,138,240` | near `~10B` | Yes |
+| val_loss_first | `0.3174390` | report | N/A |
+| val_loss_last | `0.3180834` | non-regressing trend preferred | No |
+| val_trend_pass | `false` | `true` | No |
+| val_diffusion_loss_last | `1.2712071` | report | N/A |
+| val_gist_cosine_last | `0.0345659` | report | N/A |
+| val_gist_retrieval_top1_last | `0.0019130` | report | N/A |
+| steps_per_sec | `49.09` | throughput preserved | Yes |
+| raw_tokens_per_sec | `1,608,419.49` | throughput preserved | Yes |
+| interaction_probe_50_coherent_rate | `0.00` (`0/50`) | `>=0.60` | No |
+| interaction_probe_50_avg_decode_latency_ms | `18.47` | report | N/A |
+| interaction_probe_unique_continuations | `1/50` | high diversity preferred | No |
+| gate_pass | `false` | `true` | No |
+
+### Key Observations
+- Scale target was achieved cleanly with stable training and no NaNs.
+- Systems throughput remained strong despite 10x/10x data/step budget.
+- End-of-run validation and gist metrics were not improved enough to pass the current gate.
+- Post-train interaction probe on `best-step-0090000.ckpt` failed hard (`0/50` coherent) with complete continuation collapse (same continuation returned for all prompts).
+- Probe artifact: `experiments/modal_downloads/exp030_modal_fp16_20m10b_001/interaction_probe_50.json`.
+
+### Decisions
+- [x] Mark EXP-030 training run complete and archive summary artifacts.
+- [x] Run 50-prompt interaction probe on `best-step-0090000.ckpt`.
+- [x] Compare EXP-030 interaction quality against EXP-028 and EXP-029 under the same probe rubric.
+- [ ] Treat scale-up alone as insufficient for interaction quality; prioritize decoder/retrieval redesign experiments.
+
+### Status: [COMPLETE]
+
+## EXP-031: FP16 Modal 2M/3B Rerun After Diffusion Optimizer Fix
+
+**Date:** 2026-06-14
+**Hypothesis:** Fixing optimizer wiring to include diffusion parameters (instead of optimizing scalar LM-only weights) will reduce post-train interaction collapse at fixed EXP-029 data/step budget.
+**Config:** `configs/fp16_chunk_modal_2m_unique_3b_total.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Failure Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- Scalar metrics remain within EXP-029 band (no major regression in `val_loss_last`).
+- 50-prompt probe coherence improves materially from EXP-029 (`>0.06`) and avoids dominant single-chunk collapse.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| val_gist_cosine_last / val_gist_retrieval_top1_last | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+| dominant_nearest_chunk_share | post-train probe diagnostics |
+
+### Decisions
+- [x] Patch `FP16ChunkLMModule.configure_optimizers` to optimize full module parameters.
+- [x] Add regression test ensuring diffusion params are present in optimizer param groups.
+- [x] Launch detached rerun with same EXP-029 config for before/after comparison.
+- [x] Run 50-prompt interaction probe on rerun best checkpoint and compare against EXP-029.
+- [x] Monitor detached app `ap-cRRjKivvbQOEoFqNiusoCO` to completion and pull summary/checkpoints.
+
+### Results
+| Metric | Value | EXP-029 (pre-fix) | Delta |
+|--------|-------|-------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.0306509` | `0.3171909` | `-0.2865400` |
+| val_loss_last | `0.0032716` | `0.3171835` | `-0.3139119` |
+| val_trend_pass | `true` | `true` | same |
+| val_diffusion_loss_last | `0.0120417` | `1.2676076` | `-1.2555659` |
+| val_gist_cosine_last | `0.9968244` | `0.0366144` | `+0.9602100` |
+| val_gist_retrieval_top1_last | `0.0018888` | `0.0017919` | `+0.0000969` |
+| steps_per_sec | `47.99` | `49.16` | `-1.17` |
+| raw_tokens_per_sec | `1,570,367.78` | `1,608,505.10` | `-38,137.32` |
+| interaction_probe_50_coherent_rate | `0.86` (`43/50`) | `0.06` (`3/50`) | `+0.80` |
+| interaction_probe_50_avg_decode_latency_ms | `23.02` | `17.51` | `+5.51` |
+| interaction_probe_unique_continuations | `36/50` | `2/50` | `+34` |
+| dominant_continuation_share | `0.06` | `0.94` | `-0.88` |
+| gate_pass | `true` | `true` | same |
+
+### Key Observations
+- The optimizer fix was active in this run: checkpoint optimizer state tracks full-module params (`84`) rather than model-only (`70`).
+- Interaction collapse was largely resolved versus pre-fix EXP-029: coherence rose from `3/50` to `43/50`, and continuation diversity recovered strongly.
+- Throughput remained in the same operating range, with a modest latency increase in probe-time decoding.
+- Training metrics improved dramatically; this may reflect better optimization of diffusion pathway and warrants a follow-up sanity check for generalization/calibration before drawing broader architectural conclusions.
+
+### Decisions
+- [x] Accept EXP-031 as the corrected reference for the 2M/3B setting.
+- [x] Treat pre-fix EXP-029/EXP-030 interaction failures as confounded by optimizer wiring.
+- [ ] Re-run the 20M/10B scale setting with the optimizer fix for a clean scale conclusion.
+
+### Status: [COMPLETE]
+
+## EXP-026: FP16 64-Window 100M-Unique Token-Scale Run
+
+**Date:** 2026-06-14
+**Hypothesis:** Scaling the frozen best 64-window diffusion baseline toward ~100M unique raw-token-equivalent training tokens should provide clearer prolonged-run behavior while preserving stability.
+**Config:** `configs/fp16_chunk_best64_100m_unique.yaml` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run launches and remains stable over prolonged training.
+- Data prep reaches target scale without memory collapse.
+- Final metrics can be compared directly against frozen baseline `EXP-022`.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | run |
+| nan_batches | run |
+| train_chunks / val_chunks | run |
+| val_loss_first/last | run |
+| val_diffusion_loss_last | run |
+| val_gist_cosine_last | run |
+| val_gist_retrieval_top1_last | run |
+| steps_per_sec | run |
+| raw_tokens_per_sec | run |
+
+### Results
+| Metric | Value | EXP-024 Frozen 64 Baseline | Delta |
+|--------|-------|----------------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.31826` | `0.31940` | `-0.00114` |
+| val_loss_last | `0.31760` | `0.31776` | `-0.00016` |
+| val_diffusion_loss_last | `1.26915` | `1.27006` | `-0.00091` |
+| val_gist_cosine_last | `0.03638` | `0.03566` | `+0.00072` |
+| val_gist_retrieval_top1_last | `0.00210` | `0.00316` | `-0.00106` |
+| steps_per_sec | `10.43` | `17.11` | `-6.69` |
+| raw_tokens_per_sec | `341,645.10` | `560,581.92` | `-218,936.82` |
+| train_chunks | `1,678,912` | `11,269` | `+1,667,643` |
+
+### Key Observations
+- Run completed stably at prolonged scale with no NaN/collapse.
+- Larger unique-token coverage yielded only marginal validation-loss gains versus the frozen baseline.
+- Semantic-gist retrieval degraded despite slight cosine and scalar-loss improvements.
+- Throughput dropped substantially under the larger-scale setup.
+
+### Decisions
+- [x] Keep frozen architecture/objective fixed and scale token budget only.
+- [x] Add memory-safe chunk-target windowing for large-token diffusion runs.
+- [x] Execute prolonged 100M-unique-scale run and capture final deltas vs frozen baseline.
+
+### Status: [COMPLETE]
+
+## EXP-032: FP16 Modal 20M-Unique / 10B-Processed Rerun After Optimizer Fix
+
+**Date:** 2026-06-14
+**Hypothesis:** Re-running the 20M/10B scale configuration with full-module optimization (including diffusion parameters) will recover interaction quality relative to pre-fix EXP-030 while preserving stability and throughput.
+**Config:** `configs/fp16_chunk_modal_20m_unique_10b_total.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Scaling Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- Interaction probe coherence improves materially versus EXP-030 (`>0.00`) and avoids single-continuation collapse.
+- Throughput remains within expected range of prior Modal runs.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| val_gist_cosine_last / val_gist_retrieval_top1_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+| interaction_probe_unique_continuations | post-train probe |
+| dominant_continuation_share | post-train probe |
+
+### Decisions
+- [x] Keep architecture and data/step budgets fixed to isolate optimizer-fix impact.
+- [x] Launch detached Modal rerun with a new run id.
+- [x] Run 50-prompt interaction probe on rerun best checkpoint and compare against EXP-030.
+
+### Results
+| Metric | Value | EXP-030 (pre-fix) | Delta |
+|--------|-------|-------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.0203140` | `0.3174390` | `-0.2971250` |
+| val_loss_last | `0.1560390` | `0.3180834` | `-0.1620444` |
+| val_trend_pass | `false` | `false` | same |
+| best_val_loss (metrics.csv) | `0.0034847` @ step `79,999` | N/A | N/A |
+| val_diffusion_loss_last | `0.3851220` | `1.2712071` | `-0.8860851` |
+| val_gist_cosine_last | `0.9699826` | `0.0345659` | `+0.9354167` |
+| val_gist_retrieval_top1_last | `0.0019857` | `0.0019130` | `+0.0000726` |
+| steps_per_sec | `51.06` | `49.09` | `+1.97` |
+| raw_tokens_per_sec | `1,673,145.02` | `1,608,419.49` | `+64,725.53` |
+| interaction_probe_50_coherent_rate | `0.38` (`19/50`) | `0.00` (`0/50`) | `+0.38` |
+| interaction_probe_50_avg_decode_latency_ms | `22.29` | `18.47` | `+3.82` |
+| interaction_probe_unique_continuations | `7/50` | `1/50` | `+6` |
+| dominant_continuation_share | `0.44` | `1.00` | `-0.56` |
+| gate_pass | `false` | `false` | same |
+
+### Key Observations
+- Optimizer-fix rerun recovered a substantial fraction of interaction quality versus pre-fix EXP-030, and removed total single-response collapse.
+- Training dynamics show strong mid-run performance followed by end-of-run degradation (`best` at ~80k steps, then regressed by final step), indicating overtraining or schedule mismatch at this scale budget.
+- Throughput remained strong and slightly improved despite full-module optimization.
+- At 20M/10B scale, quality remains below the corrected 2M/3B reference (EXP-031), so scale-up alone still does not outperform the smaller corrected setting.
+- A probe replay on `last.ckpt` produced the same coarse coherence score (`19/50`) as `best.ckpt`, suggesting the current 50-prompt heuristic probe may be partially insensitive to late-stage drift seen in scalar validation metrics.
+
+### Decisions
+- [x] Mark EXP-032 as a partial recovery success vs pre-fix EXP-030.
+- [x] Keep EXP-031 as best current quality reference.
+- [ ] Add early-stop or checkpoint-selection-by-probe policy for long runs to avoid late-stage quality regression.
+
+### Status: [COMPLETE]
+
+## EXP-033: FP16 Modal 2M-Unique / 3B-Processed Saturation Profile v1
+
+**Date:** 2026-06-14
+**Hypothesis:** Increasing per-step GPU workload (larger `batch_size` and `compressed_seq_len`) at the same 2M/3B token budget will materially improve GPU utilization/occupancy while preserving corrected-run quality signal.
+**Config:** `configs/fp16_chunk_modal_2m_unique_3b_saturation_v1.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Systems Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- Throughput and resource utilization improve versus EXP-031 baseline profile.
+- Interaction probe quality remains competitive with EXP-031 (no severe collapse regression).
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| first_batch_seconds / gpu_mem_peak_mb | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+| interaction_probe_unique_continuations | post-train probe |
+
+### Decisions
+- [x] Keep data family and 3B processed-token target fixed (`2M/3B`) for comparability.
+- [x] Increase training workload per step (`batch_size=256`, `compressed_seq_len=32`) to push GPU saturation.
+- [x] Launch detached run and capture utilization/quality deltas vs EXP-031.
+- [x] Probe best checkpoint with the same 50-prompt rubric.
+
+### Results
+| Metric | Value | EXP-031 (2M/3B fixed baseline) | Delta |
+|--------|-------|---------------------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.1196542` | `0.0306509` | `+0.0890033` |
+| val_loss_last | `0.0175205` | `0.0032716` | `+0.0142489` |
+| val_trend_pass | `true` | `true` | same |
+| val_diffusion_loss_last | `0.0688509` | `0.0120417` | `+0.0568091` |
+| val_gist_cosine_last | `0.9829721` | `0.9968244` | `-0.0138523` |
+| val_gist_retrieval_top1_last | `0.0001460` | `0.0018888` | `-0.0017428` |
+| steps_per_sec | `30.99` | `47.99` | `-17.00` |
+| compressed_tokens_per_sec | `252,810.66` | `24,537.00` | `+228,273.66` |
+| raw_tokens_per_sec | `16,179,882.18` | `1,570,367.78` | `+14,609,514.40` |
+| gpu_mem_peak_mb | `865.01` | `219.84` | `+645.18` |
+| interaction_probe_50_coherent_rate | `1.00` (`50/50`) | `0.86` (`43/50`) | `+0.14` |
+| interaction_probe_50_avg_decode_latency_ms | `24.09` | `23.02` | `+1.07` |
+| interaction_probe_unique_continuations | `9/50` | `36/50` | `-27` |
+| dominant_continuation_share | `0.26` | `0.06` | `+0.20` |
+| gate_pass | `true` | `true` | same |
+
+### Key Observations
+- Saturation profile completed in ~3 minutes and increased per-run token throughput dramatically (`~10.3x` raw-token-equivalent throughput), with higher but still modest GPU memory usage.
+- Core training quality metrics regressed versus EXP-031 (`val_loss`, `val_diffusion_loss`, and especially `val_gist_retrieval_top1`), despite passing trend and stability gates.
+- The heuristic interaction probe reported `50/50` coherent, but continuation diversity dropped sharply and some decoded outputs show mojibake artifacts, indicating the probe metric is likely over-optimistic for this profile.
+- This suggests the saturation setup improved systems efficiency but altered optimization dynamics enough to hurt representation quality.
+
+### Decisions
+- [x] Keep EXP-033 as systems-throughput success, not quality best.
+- [ ] Add a stricter interaction evaluation rubric (anti-mojibake and stronger diversity/semantic checks) before trusting probe-perfect scores.
+- [ ] Tune saturation profile (e.g., LR/grad accumulation/sequence length mix) to recover gist retrieval while retaining higher utilization.
+
+### Status: [COMPLETE]
+
+## EXP-034: FP16 Modal 2M-Unique / 3B-Processed Saturation Profile v2 (Balanced)
+
+**Date:** 2026-06-14
+**Hypothesis:** A balanced saturation profile (moderately high per-step workload with more update steps than v1) will retain much of the utilization gain while recovering gist/quality metrics relative to EXP-033.
+**Config:** `configs/fp16_chunk_modal_2m_unique_3b_saturation_v2.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Systems Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- Throughput remains above EXP-031 baseline profile.
+- Quality metrics (especially `val_gist_retrieval_top1`) improve versus EXP-033.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| gpu_mem_peak_mb | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| val_gist_retrieval_top1_last | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+| interaction_probe_unique_continuations | post-train probe |
+
+### Decisions
+- [x] Keep 2M/3B budget fixed for comparability.
+- [x] Use balanced saturation settings (`batch_size=192`, `compressed_seq_len=16`) with lower LR.
+- [x] Launch detached run and compare against EXP-031 and EXP-033.
+- [x] Probe best checkpoint with 50-prompt rubric.
+
+### Results
+| Metric | Value | EXP-031 (quality baseline) | EXP-033 (sat v1) |
+|--------|-------|-----------------------------|------------------|
+| stable | `true` | `true` | `true` |
+| nan_batches | `0` | `0` | `0` |
+| val_loss_first | `0.0979743` | `0.0306509` | `0.1196542` |
+| val_loss_last | `0.0139197` | `0.0032716` | `0.0175205` |
+| val_trend_pass | `true` | `true` | `true` |
+| val_diffusion_loss_last | `0.0546350` | `0.0120417` | `0.0688509` |
+| val_gist_cosine_last | `0.9995532` | `0.9968244` | `0.9829721` |
+| val_gist_retrieval_top1_last | `0.0003274` | `0.0018888` | `0.0001460` |
+| steps_per_sec | `32.75` | `47.99` | `30.99` |
+| raw_tokens_per_sec | `6,415,257.29` | `1,570,367.78` | `16,179,882.18` |
+| gpu_mem_peak_mb | `444.47` | `219.84` | `865.01` |
+| interaction_probe_50_coherent_rate | `0.92` (`46/50`) | `0.86` (`43/50`) | `1.00` (`50/50`) |
+| interaction_probe_50_avg_decode_latency_ms | `15.04` | `23.02` | `24.09` |
+| interaction_probe_unique_continuations | `25/50` | `36/50` | `9/50` |
+| dominant_continuation_share | `0.08` | `0.06` | `0.26` |
+| gate_pass | `true` | `true` | `true` |
+
+### Key Observations
+- Saturation v2 substantially improved throughput over EXP-031 (`~4.1x` raw-token-equivalent throughput) while avoiding the extreme quality collapse signatures from saturation v1.
+- Compared with EXP-033, v2 recovered quality-direction metrics (`val_loss`, `val_diffusion_loss`, `gist_retrieval_top1`) and much better continuation diversity.
+- Compared with EXP-031, v2 is still weaker on core gist retrieval and scalar validation quality, so it should be treated as a systems-efficiency profile rather than the best quality checkpoint family.
+- Heuristic interaction score remains high, but mojibake incidence is still elevated in saturated profiles, reinforcing the need for stricter interaction evaluation.
+
+### Decisions
+- [x] Mark EXP-034 as a better quality/throughput tradeoff than EXP-033.
+- [x] Keep EXP-031 as the primary quality reference and EXP-034 as the primary saturation reference.
+- [ ] Add stricter decode-quality checks (mojibake/semantic consistency) before using heuristic coherence as a sole selection criterion.
+
+### Status: [COMPLETE]
+
+## EXP-035: FP16 Modal 2M-Unique / 32B-Processed 8GB-Target Saturation v1
+
+**Date:** 2026-06-14
+**Hypothesis:** Pushing per-step workload to target ~8GB GPU memory while increasing total processed tokens (to retain enough optimizer updates) can improve hardware utilization without collapsing quality.
+**Config:** `configs/fp16_chunk_modal_2m_unique_32b_8gb_target_v1.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Systems Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- `gpu_mem_peak_mb` is near target (`~8,192 MB`, tolerance ±20%).
+- Throughput exceeds EXP-034 while preserving non-collapsed interaction behavior.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| gpu_mem_peak_mb / first_batch_seconds | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| val_gist_retrieval_top1_last | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+| interaction_probe_unique_continuations | post-train probe |
+
+### Ratio Evaluation Plan
+- Compare against EXP-034 on a simple Pareto basis:
+  - maximize `raw_tokens_per_sec`,
+  - maximize `val_gist_retrieval_top1_last`,
+  - minimize `|gpu_mem_peak_mb - 8192|`.
+
+### Decisions
+- [x] Increase batch/context aggressively (`batch_size=1536`, `compressed_seq_len=64`) for memory target pursuit.
+- [x] Increase processed-token budget to ~32B (`max_steps=5000`) to avoid severe under-updating.
+- [x] Launch detached run and evaluate memory/throughput/quality tradeoff against EXP-034.
+- [ ] Run 50-prompt interaction probe on best checkpoint.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| launch/outcome | training aborted | run completion | No |
+| failure point | `torch.matmul(decoded_flat, z0_flat^T)` OOM | N/A | N/A |
+| attempted alloc | `18.00 GiB` | fit in available GPU mem | No |
+| process memory at crash | `8.04 GiB` | report | N/A |
+
+### Key Observations
+- v1 exceeded the quadratic diffusion-similarity memory boundary at `batch_size=1536, compressed_seq_len=64`.
+- Failure happened early in training (epoch 0), so no valid training/quality comparison can be drawn.
+
+### Decisions
+- [x] Mark EXP-035 as OOM failure.
+- [x] Prepare near-limit rerun with reduced batch size while keeping long context and high processed-token budget.
+
+### Status: [FAILED]
+
+## EXP-036: FP16 Modal 2M-Unique / 32B-Processed 8GB-Near-Limit v2
+
+**Date:** 2026-06-14
+**Hypothesis:** Reducing `batch_size` from 1536 to 1184 at `compressed_seq_len=64` will remain just under the OOM boundary while still delivering high saturation and throughput.
+**Config:** `configs/fp16_chunk_modal_2m_unique_32b_8gb_target_v2.yaml` (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Systems Analysis)
+
+### Success Criteria
+- Run completes detached with `stable=true` and `nan_batches=0`.
+- No CUDA OOM at training step.
+- `gpu_mem_peak_mb` materially higher than EXP-034 and below hard limit.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| gpu_mem_peak_mb / first_batch_seconds | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| val_loss_last / val_diffusion_loss_last | train stage |
+| interaction_probe_50_coherent_rate | post-train probe |
+
+### Decisions
+- [x] Keep long context (`compressed_seq_len=64`) and high processed-token budget (~31.5B).
+- [x] Reduce batch to `1184` to stay below v1 OOM threshold.
+- [x] Launch detached run and verify memory headroom.
+- [x] Run 50-prompt interaction probe on best checkpoint.
+
+### Results
+| Metric | Value | EXP-034 (sat v2 baseline) | Delta |
+|--------|-------|---------------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.2486130` | `0.0979743` | `+0.1506387` |
+| val_loss_last | `0.0222828` | `0.0139197` | `+0.0083631` |
+| val_trend_pass | `true` | `true` | same |
+| val_diffusion_loss_last | `0.0880828` | `0.0546350` | `+0.0334478` |
+| val_gist_cosine_last | `0.9728882` | `0.9995532` | `-0.0266650` |
+| val_gist_retrieval_top1_last | `0.0000092` | `0.0003274` | `-0.0003182` |
+| steps_per_sec | `4.73` | `32.75` | `-28.02` |
+| compressed_tokens_per_sec | `346,903.76` | `100,238.40` | `+246,665.36` |
+| raw_tokens_per_sec | `22,201,840.63` | `6,415,257.29` | `+15,786,583.34` |
+| gpu_mem_peak_mb | `15,549.32` | `444.47` | `+15,104.85` |
+| interaction_probe_50_coherent_rate | `0.94` (`47/50`) | `0.92` (`46/50`) | `+0.02` |
+| interaction_probe_50_avg_decode_latency_ms | `25.82` | `15.04` | `+10.78` |
+| interaction_probe_unique_continuations | `18/50` | `25/50` | `-7` |
+| dominant_continuation_share | `0.14` | `0.08` | `+0.06` |
+| gate_pass | `true` | `true` | same |
+
+### Key Observations
+- v2 completed without OOM and achieved the intended “near-limit” memory saturation, but overshot the original 8GB target substantially (`~15.5GB` peak).
+- Token-throughput increased strongly, but steps/sec dropped sharply due much heavier per-step work; wall-clock speedup is therefore mixed.
+- Quality metrics regressed versus EXP-034 (notably gist retrieval), and continuation diversity also declined.
+- Heuristic coherence remained high, but mojibake incidence stayed high in high-saturation profiles, reinforcing probe-score limitations.
+
+### Decisions
+- [x] Mark EXP-036 as successful for memory saturation/stability, but not quality-optimal.
+- [x] Reject EXP-036 as the best quality-throughput ratio profile.
+- [ ] Use EXP-034 as current Pareto reference and design a narrower near-target memory sweep (around 8–10GB) for better ratio search.
+
+### Status: [COMPLETE]
+
+## EXP-037: Interaction Evaluation Hardening v2 (Strict Probe Rubric)
+
+**Date:** 2026-06-14
+**Hypothesis:** Replacing heuristic-only coherence with a stricter probe rubric (mojibake + diversity + dominance + strict per-row quality) will better detect degraded outputs in saturated profiles.
+**Config:** `scripts/run_fp16_interaction_probe.py` (strict rubric update), `tests/test_interaction_probe_metrics.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Evaluation Methodology)
+
+### Success Criteria
+- Strict metrics are emitted in probe artifacts without breaking existing fields.
+- A high-mojibake run that previously looked strong under old coherence should fail strict gate.
+- Tests cover strict rubric logic and aggregate gate behavior.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| Probe script compatibility | existing fields preserved + new strict fields added | preserve backward compatibility | Yes |
+| Unit tests | `2 passed` (`tests/test_interaction_probe_metrics.py`) | pass | Yes |
+| Strict replay on EXP-034 | `coherent_rate=0.92`, `strict_coherent_rate=0.02`, `mojibake_rows=39`, `strict_gate_pass=false` | catch hidden degradation | Yes |
+
+### Key Observations
+- The old heuristic coherence metric can remain high even with serious decode artifacts; strict metrics expose this mismatch.
+- Aggregate anti-collapse fields (`unique_continuations`, `dominant_continuation_share`, `mojibake_rows`, `strict_gate_pass`) provide better run-level selection signals.
+
+### Decisions
+- [x] Adopt strict probe metrics for all future interaction-readiness comparisons.
+- [x] Keep legacy `coherent_rate` for historical continuity, but do not use it as sole gate.
+- [x] Add a fixed judge set and rubric-based runner (see EXP-038).
+
+### Status: [COMPLETE]
+
+## EXP-038: Fixed Prompt Set v1 + Rubric Judge Runner v1
+
+**Date:** 2026-06-14
+**Hypothesis:** A fixed 100-prompt set plus rubric-based judge runner will make interaction evaluation reproducible and more trustworthy than coherence-only heuristics.
+**Config:** `research/eval/fixed_prompt_set_v1.jsonl`, `research/eval/fixed_prompt_set_v1.meta.json`, `scripts/run_fp16_interaction_probe.py` (fixed prompt set + rubric scoring), `tests/test_interaction_probe_metrics.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 4 (Experimental Setup), 6 (Evaluation Methodology)
+
+### Success Criteria
+- Fixed prompt set artifact exists and is versioned.
+- Probe script can run directly from fixed prompt set (`--prompt-set-file`) without dataset sampling.
+- Rubric outputs run-level scores/pass rate and per-row rubric fields.
+- Unit tests cover fixed set loading + rubric behavior.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| Fixed prompt set size | `100` prompts | `>=50` | Yes |
+| Prompt set artifacts | `fixed_prompt_set_v1.jsonl` + metadata json | present | Yes |
+| Unit tests | `4 passed` (`tests/test_interaction_probe_metrics.py`) | pass | Yes |
+| Rubric replay (EXP-034, fixed 100 prompts) | `coherent_rate=0.93`, `strict_coherent_rate=0.07`, `rubric_pass_rate=0.25`, `mojibake_rows=75`, `strict_gate_pass=false` | expose hidden degradation | Yes |
+
+### Key Observations
+- Fixed-prompt evaluation removes dataset-streaming variance and gives deterministic cross-run comparability.
+- Rubric scores materially disagree with legacy coherence for artifact-heavy outputs, which is desirable for paper-grade evaluation integrity.
+
+### Decisions
+- [x] Use `research/eval/fixed_prompt_set_v1.jsonl` as default evaluation set for current study phase.
+- [x] Require strict + rubric metrics in addition to legacy coherence for future result tables.
+- [ ] Add a judge-quality calibration pass (human or LLM-rubric cross-check) before paper freeze.
+
+### Status: [COMPLETE]
+
+## EXP-023: FP16 64-Window Experimental Model (Small Training Run)
+
+**Date:** 2026-06-13
+**Hypothesis:** A modestly larger 64-window diffusion model (vs smoke config) can remain stable while improving semantic-gist metrics and preserving strong throughput for experimental-model feasibility.
+**Config:** `configs/fp16_chunk_experimental_64.yaml` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run completes without NaNs/collapse.
+- Diffusion metrics (`val_diffusion_loss`, `val_gist_cosine`, `val_gist_retrieval_top1`) are finite.
+- Throughput remains practical for iteration.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | run |
+| nan_batches | run |
+| val_loss_first/last | run |
+| val_diffusion_loss_last | run |
+| val_gist_cosine_last | run |
+| val_gist_retrieval_top1_last | run |
+| steps_per_sec | run |
+| raw_tokens_per_sec | run |
+
+### Decisions
+- [x] Keep the architecture in the same FP16-token-window family (no MoE).
+- [x] Run the experimental `64` config end-to-end.
+- [x] Compare against prior 64 smoke diffusion run (`EXP-022`) for signal direction.
+
+### Results
+| Metric | Value | EXP-022 64 Baseline | Delta |
+|--------|-------|----------------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.32073` | `0.31940` | `+0.00132` |
+| val_loss_last | `0.31888` | `0.31776` | `+0.00113` |
+| val_diffusion_loss_last | `1.27405` | `1.27006` | `+0.00399` |
+| val_gist_cosine_last | `0.03137` | `0.03566` | `-0.00429` |
+| val_gist_retrieval_top1_last | `0.00223` | `0.00316` | `-0.00093` |
+| steps_per_sec | `12.11` | `17.11` | `-5.00` |
+| raw_tokens_per_sec | `395,957.88` | `560,581.92` | `-164,624.04` |
+| trend_pass | `true` | `true` | same |
+
+### Key Observations
+- The larger experimental model remained stable and trend-pass, so it is viable from a training-stability standpoint.
+- In this run, quality and gist metrics were worse than the smaller 64 diffusion baseline, with a notable throughput drop.
+- This invalidates the hypothesis that this specific larger setting improves gist signal out of the box; it likely needs retuning (learning rate, diffusion weights, or latent width).
+
+### Status: [COMPLETE]
+
+## EXP-021: FP16 Chunk-Scalar Diffusion Encode/Decode Feasibility (64 & 8)
+
+**Date:** 2026-06-13
+**Hypothesis:** Adding a context-conditioned latent diffusion encode/decode objective on top of the scalar LM will preserve training stability while improving semantic-gist reconstruction signal for both `chunk_size=64` and `chunk_size=8`.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` + CLI overrides for diffusion enabled and `chunk_size_tokens in {64,8}` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 3 (Methodology), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Both runs complete with no NaNs/collapse.
+- Both runs emit finite scalar loss and diffusion loss metrics.
+- Both runs produce `results.json` with diffusion fields populated.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | per run |
+| nan_batches | per run |
+| val_loss_first/last | per run |
+| val_diffusion_loss_last | per run |
+| val_trend_pass | per run |
+| steps_per_sec | per run |
+| raw_tokens_per_sec | per run |
+
+### Decisions
+- [x] Keep non-diffusion architecture and dataset settings fixed.
+- [x] Run diffusion feasibility for `chunk_size=64`.
+- [x] Run diffusion feasibility for `chunk_size=8`.
+- [x] Compare throughput and trend against non-diffusion baselines.
+
+### Results
+| Chunk | Stable | Val Loss First | Val Loss Last | Val Diffusion Loss Last | Trend Pass | Steps/s | Raw Tok/s |
+|-------|--------|----------------|---------------|--------------------------|------------|---------|-----------|
+| 64 | true | 0.31940 | 0.31776 | 1.27006 | true | 18.01 | 589,863.26 |
+| 8  | true | 0.32147 | 0.31973 | 1.27148 | true | 12.35 | 50,604.81 |
+
+### Key Observations
+- Both diffusion runs were stable with no NaNs/collapse.
+- Diffusion metrics were populated in results artifacts (`val_diffusion_loss_last` finite for both runs).
+- Total validation loss scale is higher than non-diffusion runs because objective now includes weighted diffusion terms; compare trends and per-component metrics rather than raw loss magnitude alone.
+- Throughput dropped versus non-diffusion baselines, as expected due added latent diffusion path.
+
+### Status: [COMPLETE]
+
+## EXP-022: FP16 Diffusion Semantic-Gist Evaluation (64 vs 8)
+
+**Date:** 2026-06-13
+**Hypothesis:** With diffusion enabled, `chunk_size=64` should preserve semantic gist better than `chunk_size=8` on latent-level semantic metrics (cosine similarity and retrieval top-1), while maintaining stable training.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` + overrides for diffusion enabled and `chunk_size_tokens in {64,8}` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Both runs are stable (`nan_batches=0`).
+- `results.json` contains `val_gist_cosine_last` and `val_gist_retrieval_top1_last`.
+- Metrics are comparable across both chunk sizes.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | per run |
+| val_loss_first/last | per run |
+| val_diffusion_loss_last | per run |
+| val_gist_cosine_last | per run |
+| val_gist_retrieval_top1_last | per run |
+| steps_per_sec | per run |
+
+### Decisions
+- [x] Add semantic-gist validation metrics to diffusion path.
+- [x] Run diffusion eval for `chunk_size=64`.
+- [x] Run diffusion eval for `chunk_size=8`.
+- [x] Compare gist metrics and select preferred chunk size for gist-oriented follow-ups.
+
+### Results
+| Chunk | Stable | Val Loss First | Val Loss Last | Val Diffusion Loss Last | Val Gist Cosine Last | Val Gist Retrieval@1 Last | Trend Pass | Steps/s |
+|-------|--------|----------------|---------------|--------------------------|----------------------|---------------------------|------------|---------|
+| 64 | true | 0.31940 | 0.31776 | 1.27006 | 0.03566 | 0.00316 | true | 17.11 |
+| 8  | true | 0.32147 | 0.31973 | 1.27148 | 0.01298 | 0.00197 | true | 11.78 |
+
+### Key Observations
+- Both runs remained stable with diffusion enabled and passed trend gating.
+- `64` outperformed `8` on both semantic-gist metrics:
+  - cosine similarity (`0.03566` vs `0.01298`)
+  - retrieval top-1 (`0.00316` vs `0.00197`)
+- `64` also retained higher throughput, strengthening it as the preferred gist-oriented operating point in this architecture.
+
+### Status: [COMPLETE]
+
+## EXP-006: Adapter Route on Standard Transformer Backbone
+
+**Date:** 2026-06-11
+**Hypothesis:** A lightweight DABE adapter module (bit projection + variable-width gating) can be attached to a standard causal transformer with stable optimization and without degrading validation loss versus a matched no-adapter baseline at equal step budget.
+**Config:** `configs/adapter_feasibility.yaml` (commit: working tree)
+**WandB:** offline run `pdnam6gu` (tiny smoke)
+**Paper Section:** 3 (Methodology), 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- Adapter model trains without NaNs/collapse.
+- Validation loss is within acceptable feasibility margin versus matched baseline.
+- Adapter width allocation is non-degenerate (uses a spread across configured bit-width range).
+
+### Decisions
+- [x] Run adapter route as a dedicated experimental branch (`exp/adapter-route-feasibility`).
+- [x] Implement adapter track plumbing and run a tiny smoke before full budget.
+- [x] Debug high-loss adapter behavior and re-run with calibrated adapter LR/init before go/no-go.
+
+### Tiny Smoke Results
+| Metric | Value | Baseline (No Adapter) | Delta |
+|--------|-------|-----------------------|-------|
+| Adapter val loss | 87.03 | 21.30 | +65.73 |
+| Adapter width std | 0.405 | N/A | N/A |
+| Stability | stable | stable | no NaNs |
+| Decision Gate | `competitive=false` | N/A | N/A |
+
+### Key Observations
+- Adapter path is wired end-to-end (shape validation + train + gate).
+- Width allocation is non-degenerate (`val_width_std=0.405`), so the adapter is actively varying bit-width.
+- Despite stable training, quality regressed sharply in this tiny run, invalidating the current initialization/optimization hypothesis for immediate competitiveness.
+
+### Status: [FAILED]
+
+## EXP-020: FP16 Chunk-Scalar Reproducibility Sweep (Seeds x Chunk Sizes)
+
+**Date:** 2026-06-13
+**Hypothesis:** The successful chunk sizes (`64`, `16`, `8`) in prior runs will remain stable and trend-pass across seeds, confirming that the signal is not seed-fragile.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` + CLI overrides for `fp16_chunk.compression.chunk_size_tokens in {64,16,8}` and `experiment.seed in {42,43,44}` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- All 9 runs complete without NaNs/collapse.
+- Majority trend-pass for each of `64`, `16`, and `8`.
+- Report mean/std of `val_loss_last` by chunk size.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | per run |
+| nan_batches | per run |
+| val_loss_first/last | per run |
+| val_trend_pass | per run |
+| steps_per_sec | per run |
+| raw_tokens_per_sec | per run |
+
+### Decisions
+- [x] Keep architecture and training budget fixed to isolate seed sensitivity.
+- [x] Execute 9 runs (`3 chunk sizes x 3 seeds`) consecutively.
+- [x] Aggregate results by chunk size and choose the most reliable operating point.
+
+### Results
+| Chunk | Seed | Stable | Val Loss First | Val Loss Last | Trend Pass | Steps/s | Raw Tok/s |
+|-------|------|--------|----------------|---------------|------------|---------|-----------|
+| 64 | 42 | true | 0.00027787 | 0.00024503 | true | 25.19 | 825,066.30 |
+| 64 | 43 | true | 0.00026231 | 0.00029455 | false | 25.13 | 823,138.00 |
+| 64 | 44 | true | 0.00027843 | 0.00025373 | true | 25.25 | 827,312.41 |
+| 16 | 42 | true | 0.00085261 | 0.00083841 | true | 21.04 | 172,288.80 |
+| 16 | 43 | true | 0.00082841 | 0.00084315 | false | 20.83 | 170,588.85 |
+| 16 | 44 | true | 0.00086081 | 0.00080181 | true | 20.69 | 169,447.28 |
+| 8  | 42 | true | 0.00171976 | 0.00167880 | true | 16.87 | 69,088.24 |
+| 8  | 43 | true | 0.00171765 | 0.00168975 | true | 16.16 | 66,180.51 |
+| 8  | 44 | true | 0.00179620 | 0.00170792 | true | 16.90 | 69,235.55 |
+
+### Aggregate
+| Chunk | N | Stable Count | Trend Pass Count | Val Loss Last Mean | Val Loss Last Std |
+|-------|---|--------------|------------------|--------------------|-------------------|
+| 64 | 3 | 3 | 2 | 0.00026444 | 0.00002159 |
+| 16 | 3 | 3 | 2 | 0.00082779 | 0.00001847 |
+| 8  | 3 | 3 | 3 | 0.00169216 | 0.00001201 |
+
+### Key Observations
+- All runs were stable (`nan_batches=0` throughout), confirming no seed-related collapse across these chunk sizes.
+- `64` remains best in absolute final loss, but its trend-pass is `2/3`, same as `16`.
+- `8` is the most trend-consistent (`3/3` pass) but with significantly higher loss than `16` and `64`.
+- Variance in `val_loss_last` is small for all groups, suggesting the setup is reasonably reproducible.
+
+### Status: [COMPLETE]
+
+## EXP-019: FP16 Chunk-Scalar 64-Token Confirmation (Longer Run)
+
+**Date:** 2026-06-13
+**Hypothesis:** The strong `chunk_size=64` result in EXP-018 may be a short-run artifact; extending training steps with identical settings will show whether low loss and downward trend persist.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` + overrides `experiment.name=fp16_chunk_window64_long_confirm` and `fp16_chunk.compression.chunk_size_tokens=64` and `fp16_chunk.training.max_steps=4500` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run remains stable (no NaNs/collapse).
+- Validation trend remains downward by end of run.
+- Final loss remains in the same order-of-magnitude as the prior 64-token run.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | run |
+| nan_batches | run |
+| val_loss_first/last | run |
+| val_trend_pass | run |
+| steps_per_sec | run |
+| raw_tokens_per_sec | run |
+
+### Decisions
+- [x] Keep architecture and data pipeline fixed.
+- [x] Execute longer confirmation run at `chunk_size=64`.
+- [x] Compare against EXP-018 `chunk_size=64` baseline and decide if likely fluke.
+
+### Results
+| Metric | Value | EXP-018 (64) | Delta |
+|--------|-------|--------------|-------|
+| stable | `true` | `true` | same |
+| nan_batches | `0` | `0` | same |
+| val_loss_first | `0.00027787` | `0.00027787` | `0.00000000` |
+| val_loss_last | `0.00027555` | `0.00024503` | `+0.00003052` |
+| val_trend_pass | `true` | `true` | same |
+| steps_per_sec | `25.51` | `24.61` | `+0.90` |
+| raw_tokens_per_sec | `835637.92` | `806151.94` | `+29485.98` |
+
+### Key Observations
+- The longer run remained stable and still passed the trend gate, so the `64-token` behavior is likely not a pure fluke.
+- `val_loss_last` at 4500 steps is slightly worse than the shorter 1500-step run, suggesting diminishing returns or mild drift/noise rather than sustained improvement from longer training.
+- First validation loss matched exactly because the seed/config path is deterministic up to that point.
+
+### Status: [COMPLETE]
+
+## EXP-018: FP16 Chunk-Scalar Compression Knee Sweep (64 -> 2)
+
+**Date:** 2026-06-13
+**Hypothesis:** Reducing chunk size from 64 toward 2 tokens will reveal a compression knee where stability remains good and validation trend begins to recover, identifying a workable compression point for this scalar-stream setup.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` + CLI overrides for `fp16_chunk.compression.chunk_size_tokens in {64, 32, 16, 8, 4, 2}` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- All runs complete without NaNs/collapse.
+- At least one chunk size passes trend gate (`val_loss_last <= val_loss_first`).
+- Produce a comparative loss/stability/throughput table across chunk sizes.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable | per run |
+| nan_batches | per run |
+| val_loss_first/last | per run |
+| val_trend_pass | per run |
+| steps_per_sec | per run |
+| raw_tokens_per_sec | per run |
+
+### Decisions
+- [x] Keep all non-compression settings fixed to isolate chunk-size effect.
+- [x] Run all six chunk sizes consecutively.
+- [x] Record comparative summary and identify provisional compression knee.
+
+### Results
+| Chunk Size | Stable | Val Loss First | Val Loss Last | Trend Pass | Steps/s | Raw Tok/s |
+|------------|--------|----------------|---------------|------------|---------|-----------|
+| 64 | true | 0.00027787 | 0.00024503 | true | 24.61 | 806,151.94 |
+| 32 | true | 0.00040528 | 0.00046108 | false | 23.20 | 379,647.98 |
+| 16 | true | 0.00085261 | 0.00083841 | true | 20.76 | 170,058.45 |
+| 8  | true | 0.00171976 | 0.00167880 | true | 16.96 | 69,471.36 |
+| 4  | true | 0.00392789 | 0.00386183 | true | 12.41 | 25,417.54 |
+| 2  | true | 0.00897255 | 0.00933786 | false | 7.46 | 7,634.68 |
+
+### Key Observations
+- All six runs were stable (`nan_batches=0` across the sweep), so optimization did not collapse even at aggressive compression.
+- Validation loss worsens as compression becomes more aggressive (smaller chunk size), with the best final loss at `chunk_size=64`.
+- Trend gate is non-monotonic (`64/16/8/4` pass, `32/2` fail), indicating some measurement noise around this tiny-loss regime.
+- `chunk_size=2` initially failed once due transient HF streaming/network error and then succeeded on retry (`run_id=fp16_chunk_window2_smoke_20260613_211932`).
+- Provisional knee for this setup is around `8-16` tokens/chunk: still trend-pass with materially better loss than `4` and `2`, while retaining notable compression over token-level modeling.
+
+### Status: [COMPLETE]
+
+## EXP-007: Adapter Stabilization + Width-Init Sensitivity
+
+**Date:** 2026-06-11
+**Hypothesis:** Keeping the adapter near-identity at init (small gate + residual scale) while restoring a small non-zero width predictor initialization should improve optimization and recover competitive tiny-budget validation loss.
+**Config:** `configs/adapter_feasibility_stabilized.yaml` (commit: working tree), plus CLI override probes
+**WandB:** offline runs `lnlnjufs`, `k9f0caml`, `xnme32ge`, `81h7lr1d`, `m39bf8hu`, `td4qxcpd`, `f3u7fxs0`, `dw0btff5`, `ym29c6li`
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Failure Analysis)
+
+### Results
+| Slice | Adapter Val Loss | Baseline Val Loss | Delta | Width Std | Competitive |
+|--------|------------------|-------------------|-------|-----------|-------------|
+| Stabilized, zero width-init (`seeds=42,43,44`) | `58.45 ± 3.44` | `20.48 ± 0.38` | `+37.97 ± 3.56` | `0.000 ± 0.000` | `0/3` |
+| Width-init probe (`seed=42`, `width_predictor_weight_init_std=0.02`) | `21.02` | `20.13` | `+0.89` | `0.421` | `1/1` |
+| Width-init follow-up (`seeds=42,43,44`) | `34.20 ± 20.25` | `20.26 ± 0.26` | `+13.94 ± 20.47` | `0.005 ± 0.007` | `0/3` |
+| Reproducibility audit (`seed=42` duplicated, same config/overrides) | run A: `64.66`; run B: `21.62` | run A: `66.97`; run B: `64.24` | unstable | run A: `0.002`; run B: `0.238` | inconsistent |
+
+### Key Observations
+- Zero-initializing the width predictor in the stabilized config collapsed width allocation to a near-constant schedule (`val_width_std≈0`), and adapter loss remained far above baseline.
+- A single width-init probe (`0.02`) showed that non-zero width diversity can recover near-baseline loss quickly.
+- Follow-up multi-seed and duplicate-seed checks were highly unstable, including divergent outcomes with the same seed/config, which blocks a clean feasibility claim.
+- No NaN/collapse events were observed, but optimization quality and decision-gate outcomes are not yet reproducible.
+
+### Decisions
+- [x] Add stabilized adapter path (near-identity init + calibrated adapter LR).
+- [x] Run 3-seed mini sweep for stabilized config.
+- [x] Run width-init sensitivity probe and a follow-up 3-seed check.
+- [x] Add seed-hardening in runner/datamodules (global seeding + seeded dataloader generators).
+- [x] Stop adapter-route feasibility for now and return to standard DABE on Metal.
+- [ ] Revisit adapter route only after standard DABE milestones are stabilized.
+
+### Status: [FAILED]
+
+## EXP-008: Standard DABE Re-Entry on Metal
+
+**Date:** 2026-06-11
+**Hypothesis:** Returning to the standard DABE single-track feasibility path on Apple Metal should restore stable, reproducible progress and re-establish a trustworthy baseline for subsequent architecture decisions.
+**Config:** `configs/feasibility.yaml` (commit: working tree), Metal runtime (`experiment.device=auto`, MPS)
+**WandB:** offline run `lkdpkp4p` (`feasibility_standard_dabe_metal_reentry_20260611_192149`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- Run completes end-to-end on Metal without NaNs/collapse.
+- Decision gate metrics are generated for standard DABE vs BPE.
+- Results are logged and reproducible from config + run artifact.
+
+### Decisions
+- [x] Mark adapter-route feasibility as failed for this phase.
+- [x] Execute standard DABE re-entry run on Metal.
+- [x] Record metrics and update next-step plan from standard DABE baseline.
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Validation loss | 5.8680 | 39.1248 | -33.2569 |
+| Validation perplexity | 353.53 | 9.81e16 | strongly lower |
+| Compression ratio vs BPE | 1.2450 | 1.0000 | +0.2450 |
+| Training stability | stable | stable | no NaNs |
+| Decision Gate | `competitive=true` | N/A | pass |
+
+### Key Observations
+- Standard DABE pipeline completed end-to-end on Metal with no instability.
+- Compression remained favorable versus BPE (`1.245x`) while maintaining a large validation-loss margin.
+- Re-entry confirms the main track is healthy enough to continue optimization from standard DABE instead of adapter routing.
+
+### Status: [COMPLETE]
+
+## EXP-009: Standard DABE Full-Budget Feasibility on Metal
+
+**Date:** 2026-06-11
+**Hypothesis:** Running the full planned feasibility budget on Metal (no smoke reductions) will maintain stable training and confirm the standard DABE decision-gate signal against BPE.
+**Config:** `configs/feasibility.yaml` (commit: working tree), Metal runtime (`experiment.device=auto`, MPS)
+**WandB:** offline run `3oda682q` (`feasibility_standard_dabe_metal_full_budget_20260611_232459`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- End-to-end run completes without NaNs/collapse.
+- Decision gate remains competitive (`competitive=true`) at full planned budget.
+- Compression ratio vs BPE stays above `1.0`.
+
+### Decisions
+- [x] Start full-budget standard DABE run on Metal.
+- [x] Record final metrics and close feasibility gate.
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Validation loss | 4.8821 | 4.4171 | +0.4650 |
+| Validation perplexity | 131.91 | 82.86 | +49.05 |
+| Compression ratio vs BPE | 1.2708 | 1.0000 | +0.2708 |
+| Training stability | stable | stable | no NaNs |
+| Decision Gate | `competitive=true` | N/A | pass (within tolerance) |
+
+### Key Observations
+- Full-budget Metal run completed end-to-end with no collapse/NaNs.
+- DABE retained the compression advantage (`1.2708x` vs BPE).
+- Absolute validation loss is higher than BPE in this run, but still passes the configured feasibility tolerance gate (`loss_tolerance_ratio=0.15`), so the track remains viable.
+
+### Status: [COMPLETE]
+
+## EXP-010: Standard DABE Metal Optimization V1 (Bit-Budget + Train Schedule)
+
+**Date:** 2026-06-12
+**Hypothesis:** Increasing DABE's minimum bit-width and model capacity, then using a gentler 2-epoch schedule, will improve DABE validation loss enough to close the gap to BPE while preserving compression advantage.
+**Config:** `configs/feasibility_metal_opt_v1.yaml` (commit: working tree), Metal runtime (`experiment.device=auto`, MPS)
+**WandB:** offline run `05gj210j` (`feasibility_standard_dabe_metal_opt_v1_rerun_20260612_002410`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- DABE `val_loss` improves versus EXP-009 (`4.8821`) and moves closer to or below BPE.
+- Compression ratio vs BPE remains `> 1.0`.
+- Training remains stable with no NaNs/collapse.
+
+### Decisions
+- [x] Run one focused optimization candidate (no broad sweep).
+- [x] Compare against EXP-009 and decide whether to keep this direction or revise once.
+- [x] Freeze this run as the active optimization baseline for subsequent `opt_v*` iterations.
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Validation loss | 4.3850 | 4.1003 | +0.2846 |
+| Validation perplexity | 80.24 | 60.36 | +19.88 |
+| Compression ratio vs BPE | 1.2708 | 1.0000 | +0.2708 |
+| Training stability | stable | stable | no NaNs |
+| Decision Gate | `competitive=true` | N/A | pass (within tighter tolerance) |
+
+### Key Observations
+- DABE improved meaningfully vs EXP-009 (`4.8821 -> 4.3850`, `-0.4972`), while BPE also improved (`4.4171 -> 4.1003`, `-0.3168`).
+- The DABE-vs-BPE loss gap narrowed from `+0.4650` (EXP-009) to `+0.2846` (EXP-010), indicating optimization progress without collapse.
+- Compression signal remained unchanged and favorable (`1.2708x` vs BPE).
+- An initial EXP-010 attempt failed due `OSError: [Errno 28] No space left on device`; rerun succeeded after cleaning old checkpoint artifacts and setting `evaluation.save_top_k: 0` to prevent recurrent disk-pressure failures.
+
+### Status: [COMPLETE]
+
+## EXP-012: OLMo-Mix Modal Smoke (<1h)
+
+**Date:** 2026-06-12
+**Hypothesis:** Running the feasibility pipeline on small samples from `allenai/olmo-mix-1124` on Modal should complete within one hour, stay stable, and provide an initial signal before scaling.
+**Config:** `configs/feasibility_modal_olmo_smoke.yaml` (commit: working tree), Modal remote run via `scripts/modal_feasibility_smoke.py`
+**WandB:** pending (offline on Modal volume)
+**Paper Section:** 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- End-to-end run completes on Modal in under one hour.
+- DABE and BPE both train without NaNs/collapse.
+- Results artifact is saved remotely for retrieval/comparison.
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Run completion | timed out / canceled | N/A | N/A |
+| Log visibility | poor in initial launcher | N/A | N/A |
+| Result artifact | not finalized | N/A | N/A |
+
+### Key Observations
+- The initial Modal launcher architecture wrapped training in a subprocess and did not provide reliable stage-level lifecycle handling.
+- Detached launches were brittle and multiple attempts ended in cancellation/timeout before producing a trustworthy final `results.json`.
+- This invalidates EXP-012 as a publication-grade feasibility signal.
+
+### Decisions
+- [x] Move small-sample smoke data source to `allenai/olmo-mix-1124`.
+- [x] Execute smoke run remotely on Modal to avoid local internet/data constraints.
+- [x] Mark this run failed and replace launcher with a modular, class-based, stage-oriented pipeline (tokenizer / dabe_lm / bpe_baseline) with shared volume artifacts.
+- [ ] Re-run OLMo smoke using the modular launcher and record clean end-to-end metrics.
+
+### Status: [FAILED]
+
+## EXP-013: OLMo-Mix Modal Smoke (Modular Stages, GPU Tokenizer)
+
+**Date:** 2026-06-13
+**Hypothesis:** A class-based, modular Modal pipeline (separate tokenizer / DABE / BPE stages with shared volume artifacts) should complete reliably and produce a clean feasibility gate on `allenai/olmo-mix-1124` small samples.
+**Config:** `configs/feasibility_modal_olmo_smoke.yaml` (commit: working tree), run_id: `olmo_modular_002_gpu_tok`
+**WandB:** offline on Modal volume
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Failure Analysis)
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Tokenizer avg train loss | 0.5800 | N/A | N/A |
+| Compression ratio vs BPE | 3.0385 | 1.0000 | +2.0385 |
+| DABE val loss | 3.8538 | 3.2200 | +0.6338 |
+| DABE val perplexity | 47.17 | 25.03 | +22.14 |
+| Stability (DABE/BPE) | stable/stable | stable/stable | no NaNs |
+| Decision Gate | `competitive=true` | N/A | pass (within tolerance + compression) |
+
+### Key Observations
+- Modular stage execution succeeded end-to-end: tokenizer -> dabe_lm -> bpe_baseline, with artifacts persisted in `dabe-experiments` volume.
+- GPU tokenizer routing/training path was exercised and completed (operator-observed tokenizer duration: ~17 minutes).
+- DABE remained worse than BPE on absolute validation loss in this smoke setting, but passed the configured feasibility gate due tolerance + strong compression margin.
+
+### Decisions
+- [x] Keep the modular Modal stage architecture as the default remote execution path.
+- [x] Preserve stage-level restartability via shared `run_id`.
+- [ ] Run the next iteration with a stricter loss tolerance and/or larger sample budget to test whether DABE loss can close further while retaining compression.
+
+### Status: [COMPLETE]
+
+## EXP-014: OLMo-Mix Modal Scale Test V1 (Larger Sample Budget)
+
+**Date:** 2026-06-13
+**Hypothesis:** Scaling the OLMo-mix sample budget (while keeping model/training hyperparameters fixed) will preserve stability and compression signal, and improve DABE/BPE comparative reliability versus smoke-level variance.
+**Config:** `configs/feasibility_modal_olmo_scale_v1.yaml` (commit: working tree), planned run_id: `olmo_scale_v1_001`
+**WandB:** offline on Modal volume
+**Paper Section:** 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- Tokenizer, DABE LM, and BPE baseline all complete with no NaNs/collapse.
+- Stage artifacts and pipeline summary are fully written to volume.
+- Decision gate is computed from non-null DABE/BPE losses at scaled sample size.
+
+### Decisions
+- [x] Run larger-sample OLMo scale test before tightening tolerance.
+- [ ] Record final metrics and compare against EXP-013.
+- [ ] Decide whether to increase scale again or move to stricter gate.
+
+### Status: [RUNNING]
+
+## EXP-011: Standard DABE Metal Optimization V2 (Capacity + Width Floor + Longer Schedule)
+
+**Date:** 2026-06-12
+**Hypothesis:** A moderate second-step capacity increase plus a higher minimum routing bit-width and longer schedule will further reduce DABE validation loss relative to EXP-010 while preserving compression and stability.
+**Config:** `configs/feasibility_metal_opt_v2.yaml` (commit: working tree), Metal runtime (`experiment.device=auto`, MPS)
+**WandB:** offline run `u58ldxbq` (`feasibility_standard_dabe_metal_opt_v2_20260612_060850`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- DABE `val_loss` improves versus frozen baseline EXP-010 (`4.3850`).
+- Compression ratio vs BPE remains `> 1.0`.
+- Training remains stable with no NaNs/collapse.
+
+### Decisions
+- [x] Freeze EXP-010 rerun as baseline before launching opt_v2.
+- [x] Run one focused `opt_v2` candidate (no sweeps).
+- [x] Compare against EXP-010 baseline and decide keep/revise.
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Validation loss | 4.3181 | 29.0212 | -24.7031 |
+| Validation perplexity | 75.04 | 4.02e12 | strongly lower |
+| Compression ratio vs BPE | 1.2708 | 1.0000 | +0.2708 |
+| Training stability | stable | stable | no NaNs |
+| Decision Gate | `competitive=true` | N/A | pass |
+
+### Key Observations
+- DABE improved vs frozen baseline EXP-010 (`4.3850 -> 4.3181`, `-0.0669`).
+- Tokenizer optimization signal also improved (`avg_train_loss 1.9229 -> 1.5892`) with unchanged compression (`1.2708x`).
+- BPE baseline in this run collapsed unexpectedly (`val_loss 29.0212` vs `4.1003` in EXP-010), despite no NaNs, making DABE-vs-BPE gap for this run non-comparable to prior stable runs.
+- During this run, severe disk/swap pressure repeatedly occurred and required emergency cache cleanup; this likely contaminated baseline comparability.
+
+### Follow-up Decisions
+- [x] Keep `opt_v2` as a promising DABE-side candidate (improves DABE loss vs EXP-010).
+- [ ] Re-run a clean matched BPE baseline under the same `opt_v2` data/schedule once disk headroom is restored before treating the gate margin as publication-grade.
+
+### Status: [COMPLETE]
+
+## EXP-005: Single-Track Feasibility (Entropy + LFQ + Variable Width + Small LM)
+
+**Date:** 2026-06-08
+**Hypothesis:** A deterministic entropy-routed LFQ tokenizer (8..24 data bits + 4 header bits) can train stably with a small causal LM on TinyStories and reach competitive validation loss while improving compression versus a matched BPE baseline.
+**Config:** `configs/feasibility.yaml` (commit: working tree)
+**WandB:** offline runs `t8d2g8ll` (tokenizer dry-run), `mtq73nae` (full smoke), `u2pjw4lw` (matched-size full smoke)
+**Paper Section:** 3 (Methodology), 4 (Experimental Setup), 5 (Results)
+
+### Success Criteria
+- No NaN/collapse during tokenizer training or LM training.
+- DABE validation loss/perplexity remains within feasibility range against matched BPE baseline.
+- Positive compression ratio signal versus BPE on the same TinyStories split.
+
+### Implementation Smoke Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| DABE params (small LM) | 23.4M | 23.5M | -0.1M |
+| DABE val loss | 7.7062 | 25.8388 | -18.1326 |
+| Compression ratio vs BPE | 1.2670 | 1.0000 | +0.2670 |
+| Training stability (DABE/BPE) | stable/stable | stable/stable | no NaNs |
+
+### Key Observations
+- Single-track feasibility path now runs end-to-end with one command: tokenizer training -> DABE LM -> matched BPE baseline -> decision gate.
+- LFQ tokenizer artifact is exported at run time and includes span->bitcode rules plus learned projection parameters.
+- The first matched-size smoke run (`feasibility_single_track_20260608_003855`) satisfied the decision-gate conditions on tiny budgets.
+
+### Decisions
+- [x] Freeze to one feasibility track (no sweeps, no ablation expansion in this pass).
+- [x] Implement tokenizer training/export first, then DABE LM, then matched BPE baseline.
+- [x] Run the full planned feasibility budget (non-smoke) and finalize go/no-go (see EXP-009).
+
+### Status: [COMPLETE]
+
+## 2026-06-07 — Project Setup
+
+- Created project skeleton with PyTorch 2.x, Lightning, Hydra, WandB
+- Defined base interfaces: `DensityRouter` and `BitmaskEncoder`
+- Implemented stub modules for all density router and bitmask encoder variants
+- Set up transformer backbone with bitmask projection
+- Created Hydra configs for baseline BPE, fixed-width, and density-adaptive runs
+- Verified shape flow through a dummy forward pass
+
+### Next Steps
+- [ ] Implement real density scoring in EntropyRouter (masked LM entropy)
+- [ ] Implement real LFQ quantization in LFQEncoder
+- [ ] Add training loop with real data
+- [ ] Implement BPE baseline comparison
+- [ ] Run first experiments on Tatoeba/FLORES data
+
+## 2026-06-07 — Local Metal Runtime Enablement
+
+- Goal: make DABE runnable on Apple Silicon laptops for low-cost iteration
+- Added config-driven router/encoder factories so ablation configs are actually exercised
+- Added `mps`/`cpu`/`cuda` runtime resolution helpers and wired trainer accelerator selection
+- Added a lightweight `configs/local_metal.yaml` profile for M1/M2 smoke training
+- Fixed variable-width batching in `PretrainLightningModule` by padding span encodings before stacking
+- Added synthetic data fallback in datamodule when remote dataset loading fails
+- Added tests covering factories, runtime device resolution, and variable-length forward pass
+
+### Next Steps
+- [ ] Run `local_metal` for multiple seeds and record stability/memory envelopes
+- [ ] Promote `local_metal` settings into an ablation entry once metrics are logged
+
+## EXP-001: Tiny Local Metal POC (Synthetic)
+
+**Date:** 2026-06-07
+**Hypothesis:** The local Metal path can run end-to-end and produce non-degenerate reconstruction loss.
+**Config:** `configs/local_metal.yaml` with overrides `data.synthetic_only=true data.max_samples=64 training.max_epochs=1 training.batch_size=2` (commit: working tree)
+**WandB:** offline run `wandb/offline-run-20260607_224346-d0cg4wqy`
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis)
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Train loss (summary) | 5.63274 | N/A | N/A |
+| Train recon loss (summary) | 5.63274 | N/A | N/A |
+| Train contrastive loss (summary) | 0.0 | N/A | N/A |
+| Train unique targets (last logged) | 12 | N/A | N/A |
+| Train unique langs (last logged) | 1 | N/A | N/A |
+
+### Key Observations
+- End-to-end local MPS run succeeded and saved checkpoints/config/results.
+- Reconstruction loss is non-zero (fix validated).
+- Contrastive loss stayed at 0.0 in this tiny setting because final logged batch contained one language only (`unique_langs=1`).
+
+### Decisions
+- [ ] Increase effective multilingual mixing (larger batch size or language-balanced batching) before interpreting contrastive metrics.
+- [ ] Run a follow-up tiny POC with stronger language mixing.
+
+### Status: [COMPLETE]
+
+## EXP-004: Matched 2x2 Encoder Matrix (No Sweeps)
+
+**Date:** 2026-06-08
+**Hypothesis:** On matched tiny budgets, one encoder path will emerge as the pragmatic feasibility candidate.
+**Config:** `configs/local_metal.yaml` with matched overrides (synthetic and real-data pairs).
+**WandB:** offline runs (`0spgdt44`, `uu3r7vt9`, `av34dx54`, `jk3bk9rb`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Results
+| Run | Encoder | Data | Final Loss | Best CKPT tag |
+|-----|---------|------|------------|---------------|
+| `local_metal_smoke_20260607_235736` | LFQ | synthetic (`64`) | `tensor(7.9054)` | `0-8-7.6386.ckpt` |
+| `local_metal_smoke_20260607_235745` | Gumbel | synthetic (`64`) | `tensor(7.5088)` | `0-8-7.1867.ckpt` |
+| `local_metal_smoke_20260607_235753` | LFQ | real (`500`) | `tensor(7.1175)` | `0-125-6.9103.ckpt` |
+| `local_metal_smoke_20260607_235837` | Gumbel | real (`500`) | `tensor(7.7800)` | `0-125-6.8727.ckpt` |
+
+### Key Observations
+- On synthetic tiny data, Gumbel is clearly better.
+- On real tiny data, final-loss favors LFQ while best checkpoint tag is slightly better for Gumbel.
+- Net result is mixed, but LFQ remains lower-risk to implement end-to-end quickly.
+
+### Decisions
+- [x] Choose **LFQ** as the single feasibility-track candidate for tokenizer -> small LM implementation.
+- [ ] Start implementation of the single-track pipeline: deterministic entropy routing + LFQ tokenizer model + small LM.
+
+### Status: [COMPLETE]
+
+## EXP-003: Fast Tiny Validation Sweep (MPS)
+
+**Date:** 2026-06-07
+**Hypothesis:** Tiny local runs can quickly rank encoder/router choices before longer training.
+**Config:** `configs/local_metal.yaml` + per-run CLI overrides (commit: working tree)
+**WandB:** offline runs (`vv79joex`, `6k9rsbqv`, `3t40hn15`, `q5bhdq4n`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Results
+| Run | Overrides | Final Loss | Best CKPT tag |
+|-----|-----------|------------|---------------|
+| A `learned+lfq` synthetic | `data.synthetic_only=true data.max_samples=64 training.max_epochs=1 training.batch_size=8` | `tensor(7.9054)` | `0-8-7.6386.ckpt` |
+| B `fixed+lfq` synthetic | `... router.type=fixed +router.fixed_bit_width=24 ...` | `tensor(7.9243)` | `0-8-7.6878.ckpt` |
+| C `learned+gumbel` synthetic | `... encoder.type=gumbel` | `tensor(7.5088)` | `0-8-7.1867.ckpt` |
+| D `learned+lfq` real-data | `data.synthetic_only=false data.max_samples=500 training.max_epochs=1 training.batch_size=4` | `tensor(7.1175)` | `0-125-6.9103.ckpt` |
+
+### Key Observations
+- All four runs completed successfully on MPS with checkpoints written.
+- In this tiny budget, Gumbel outperformed LFQ on synthetic data.
+- Real-data tiny run achieved the best checkpoint loss among tested settings.
+
+### Decisions
+- [ ] Promote `learned+gumbel` and `learned+lfq(real)` as top two candidates for next short run.
+- [ ] Add one follow-up run with matched step budget across synthetic vs real-data for cleaner comparison.
+
+### Status: [COMPLETE]
+
+## EXP-002: Tiny Local Metal POC (Mixed-Language Batch)
+
+**Date:** 2026-06-07
+**Hypothesis:** With larger batches containing both languages, contrastive loss should become non-zero.
+**Config:** `configs/local_metal.yaml` with overrides `data.synthetic_only=true data.max_samples=64 training.max_epochs=1 training.batch_size=16` (commit: working tree)
+**WandB:** offline run `wandb/offline-run-20260607_224512-zi29s3pa`
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis)
+
+### Results
+| Metric | Value | Baseline (BPE) | Delta |
+|--------|-------|----------------|-------|
+| Train loss (final step) | 8.255 | N/A | N/A |
+| Train recon loss (final step) | 8.166 | N/A | N/A |
+| Train contrastive loss (final step) | 1.766 | N/A | N/A |
+| Train unique langs (final step) | 2 | N/A | N/A |
+| Train unique targets (final step) | 32 | N/A | N/A |
+
+### Key Observations
+- Contrastive signal is non-zero when batches include multiple languages.
+- Earlier mixed-batch run exposed a bug in `ContrastiveAlignmentLoss` that assumed fixed positive counts; this was fixed with masked per-anchor reductions.
+- Validation still logged `unique_langs=1` in this tiny setting; needs stratified batching for stable cross-language validation diagnostics.
+
+### Decisions
+- [ ] Add language-balanced sampler to ensure every batch has cross-language positives.
+- [ ] Reduce `logging.log_every_n_steps` to `1` for tiny runs with very few train steps.
+
+### Status: [COMPLETE]
+
+## EXP-015: Optimization Pass v3 Implementation (Time-to-Signal, V4-Informed)
+
+**Date:** 2026-06-13
+**Hypothesis:** A full-stack optimization pass (profiling + caching + vectorized bit path + compile/SDPA toggles + Modal hardening) can materially reduce stage wall-clock without breaking feasibility metrics.
+**Config:** `configs/feasibility_opt_v3.yaml`, `configs/feasibility_modal_olmo_opt_v3.yaml` (commit: working tree)
+**WandB:** pending (offline/local + Modal volume runs)
+**Paper Section:** 3 (Methodology), 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Runtime metadata includes prep/first-batch/throughput/resource/compile diagnostics for each stage.
+- Cached pre-encode and vectorized bit path pass correctness tests.
+- Modal detached launch contract and timeout estimation utilities are available.
+
+### Key Observations
+- Added runtime observability callback + optional profiler trace export in feasibility training path.
+- Added cache modes (`none|build|reuse`) with optional disk pre-encode for DABE/BPE windows.
+- Added vectorized `_ids_to_bits` path with parity guard against loop implementation.
+- Added V4-inspired toggles: `compressed_kv_proxy`, `balance_bias_update`, and `mtp_heads`.
+
+### Decisions
+- [x] Implement optimization config family + runtime metadata schema.
+- [x] Add modular local stage profiling entrypoint.
+- [ ] Run full `opt_v3` benchmark and compare against frozen baseline.
+
+### Status: [RUNNING]
+
+## EXP-016: Bend / Equivalent Runtime Spike for Router Segmentation
+
+**Date:** 2026-06-13
+**Hypothesis:** A bounded prototype (Bend or equivalent parallel runtime) can reach >=1.5x throughput for router segmentation with deterministic parity and <=1 day integration overhead.
+**Config:** `scripts/bend_spike/router_segment_spike.py` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 6 (Analysis), 7 (Conclusion)
+
+### Results
+| Metric | Value | Threshold | Pass |
+|--------|-------|-----------|------|
+| Speedup vs baseline | 1.2449x | >=1.5x | No |
+| Deterministic parity | true | true | Yes |
+| Integration overhead | 0.5h | <=1 day | Yes |
+| Bend binary availability | false | N/A | N/A |
+
+### Key Observations
+- Equivalent vectorized runtime candidate preserved deterministic parity but did not meet the speedup gate.
+- Bend executable was not available in this environment, so direct Bend kernel execution was not validated.
+
+### Decisions
+- [x] Mark bounded spike as **no-go** for immediate integration.
+- [ ] Keep Bend path as optional future follow-up when toolchain is available.
+
+### Status: [FAILED]
+
+## EXP-017: FP16 Chunk-Scalar Feasibility v1 (Standalone Metal)
+
+**Date:** 2026-06-13
+**Hypothesis:** A tiny causal transformer over deterministic FP16 chunk scalars (128 raw tokens -> 1 scalar) can train stably with a downward validation-loss trend, giving a throughput-first feasibility signal.
+**Config:** `configs/fp16_chunk_feasibility_smoke.yaml` (commit: working tree)
+**WandB:** N/A (standalone local run artifacts under `experiments/`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Failure Analysis)
+
+### Success Criteria
+- No NaNs/collapse (`stable=true`, `nan_batches=0`).
+- Validation trend is downward (`val_loss_last <= val_loss_first`).
+- Runtime artifact includes first-batch latency + throughput + resource metrics.
+
+### Planned Metrics
+| Metric | Target |
+|--------|--------|
+| stable | true |
+| nan_batches | 0 |
+| val_loss_first/last | downward trend |
+| steps_per_sec | report |
+| compressed_tokens_per_sec | report |
+| raw_tokens_per_sec | report |
+| gpu_mem_peak_mb | report |
+| cpu_util_avg | report |
+
+### Decisions
+- [x] Keep this track isolated from existing DABE/LFQ feasibility pipeline.
+- [x] Use TinyStories with deterministic non-overlapping 128-token chunk compression.
+- [x] Run standalone Metal smoke and record outcome immediately.
+- [x] Keep diffusion/reconstruction out of v1 to avoid confounding stability signal.
+- [ ] Run v1.1 with calibrated trend gate (moving-average or slope) to avoid tiny-noise false negatives.
+
+### Results
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first | `0.00016298` | downward trend anchor | N/A |
+| val_loss_last | `0.00016751` | `<= val_loss_first` | No |
+| val_trend_pass | `false` | `true` | No |
+| first_batch_seconds | `6.4564` | report | N/A |
+| steps_per_sec | `22.07` | report | N/A |
+| compressed_tokens_per_sec | `11199.24` | report | N/A |
+| raw_tokens_per_sec | `1433502.51` | report | N/A |
+| gpu_mem_peak_mb | `0.0` (MPS API) | report | N/A |
+| cpu_util_avg | `90.75` | report | N/A |
+| device | `mps:0` | Metal | Yes |
+
+### Key Observations
+- The standalone FP16 chunk-scalar track trains stably on Metal with no NaNs/collapse.
+- Gate failed on monotonic trend by a very small delta (`+4.54e-06` between first/last val loss), suggesting metric noise at near-zero loss scale.
+- Throughput signal is strong (`~11.2k compressed tokens/s`, `~1.43M raw-token-equivalent/s`) under the current deterministic compressor and model size.
+- Run artifacts were written to `experiments/fp16_chunk_feasibility_smoke_20260613_184647/` including config snapshot and `results.json`.
+
+### Status: [FAILED]
+
+#
+## EXP-051: TTT Inference Adapter (Mirror Decoder Heads)
+
+**Date:** 2026-06-15
+**Hypothesis:** Per-prompt bounded TTT on mirror decoder heads may reduce collapse without changing 64/8/1 routing.
+**Config:** src/inference/hierarchical_generation.py, scripts/run_fp16_hierarchical_generate.py, configs/fp16_hierarchical_inference.yaml, tests/test_hierarchical_generation.py
+
+### Results
+| Metric | No TTT | TTT (10 steps) |
+|--------|--------|----------------|
+| Run/checkpoint | exp050 best-step-0001500 | exp050 best-step-0001500 |
+| Prompts | 100 | 100 |
+| Collapse rate | 1.00 | 1.00 |
+| Avg latency | 83.43 ms | 1446.16 ms |
+| Tokens/sec | 1534.30 | 88.51 |
+| TTT applied count | 0 | 96 |
+
+### Status: [COMPLETE]
+
+## EXP-052: Mirror Decoder Diversity Regularization (No TTT)
+
+**Date:** 2026-06-15
+**Hypothesis:** Training-time diversity regularization (entropy floor + anti-peaky + adjacent-similarity penalties) can reduce repetitive collapse without test-time adaptation overhead.
+**Config:** `src/training/fp16_hierarchical_feasibility.py`, `configs/fp16_hierarchical_64_8_1_modal_saturation_v2.yaml` + overrides `fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500` (commit: working tree)
+**WandB:** N/A
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached run succeeds on `qrk-labs`.
+- Training remains stable (`nan_batches=0`).
+- Diversity metrics are logged (`val/diversity_*`).
+- Fixed-set coherence/collapse improves versus EXP-050 without TTT latency cost.
+
+### Decisions
+- [x] Log protocol entry before launch.
+- [ ] Launch detached run.
+- [ ] Validate with fixed-set probe.
+
+### Status: [RUNNING]
+
+### Launch Details (EXP-052)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-85RJGcmjGeVnnqjm8e5pUS` |
+| Run ID | `exp052_modal_fp16_hier_divreg_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_saturation_v2` |
+| Overrides | `fp16_chunk.training.batch_size=256 fp16_chunk.training.max_steps=4000 fp16_chunk.training.val_check_interval=500` |
+| Early status | started cleanly (CUDA AMP, training loop initialized) |
+
+## EXP-053: Local Hierarchical EXP-031-Scale Rerun (No Diversity Enforcement)
+
+**Date:** 2026-06-15
+**Hypothesis:** Re-running hierarchical 64/8/1 training at EXP-031 scale while disabling diversity regularization will recover interaction coherence without the collapse signature seen in EXP-052.
+**Config:** `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml` + local overrides (`decode_mirror.enabled=true`, `next_token_supervision.enabled=true`, `diversity_regularization.enabled=false`) (commit: working tree)
+**WandB:** N/A (local artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Local run remains stable (`nan_batches=0`, no non-finite loss).
+- Validation trend stays downward under EXP-031-equivalent budget.
+- Post-train interaction probe shows improved coherence vs EXP-052.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| val_next_token_acc_last | train stage |
+| interaction coherence metrics | post-train probe |
+
+### Decisions
+- [x] Disable diversity regularization for this rerun.
+- [x] Keep hierarchical 64/8/1 routing and mirror-decoder path enabled.
+- [ ] Run local training and collect metrics.
+- [ ] Run fixed-set interaction probe on best checkpoint.
+
+### Status: [RUNNING]
+
+## EXP-054: Local FP16 Chunk 2M-Unique / 1B-Processed Replay
+
+**Date:** 2026-06-16
+**Hypothesis:** Re-running the known 9.8M FP16 chunk+diffusion setup (`2M unique / 1B processed`) locally will provide a faster, cleaner coherence recovery signal than the current hierarchical branch.
+**Config:** `configs/fp16_chunk_2m_unique_1b_total.yaml` (commit: working tree)
+**WandB:** N/A (local artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run is stable (`stable=true`, `nan_batches=0`).
+- Validation trend remains downward by end-of-run.
+- Best checkpoint is produced for follow-up interaction probe.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| post-train interaction coherence | probe stage |
+
+### Decisions
+- [x] Stop current hierarchical local run.
+- [x] Revert to FP16 chunk 2M/1B track.
+- [ ] Launch local detached run and monitor.
+- [ ] Probe best checkpoint on fixed prompt set.
+
+### Status: [RUNNING]
+
+## EXP-055: Local Hierarchical 64/8/1 Replay at 2M-Unique / 1B-Processed
+
+**Date:** 2026-06-16
+**Hypothesis:** Switching back to hierarchical encode/decode (`64/8/1` + decode mirror) at the 2M/1B budget will preserve stability while improving coherence relative to the flat FP16 chunk track.
+**Config:** `configs/fp16_hierarchical_64_8_1_exp031_seed.yaml` + local overrides (`max_steps=30518`, `decode_mirror.enabled=true`, `next_token_supervision.enabled=true`, `diversity_regularization.enabled=false`) (commit: working tree)
+**WandB:** N/A (local artifacts under `experiments/`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run remains stable (`nan_batches=0`, no non-finite losses).
+- Validation trend is downward at 2M/1B budget.
+- Best checkpoint is produced for fixed-set interaction probing.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_diffusion_loss_last | train stage |
+| val_next_token_acc_last | train stage |
+| interaction coherence metrics | post-train probe |
+
+### Decisions
+- [x] Stop flat FP16 2M/1B run (EXP-054).
+- [x] Relaunch hierarchical 64/8/1 with decode path enabled.
+- [ ] Monitor local run to first validation checkpoint.
+- [ ] Probe best checkpoint on fixed prompt set.
+
+### Status: [RUNNING]
+
+## EXP-056: Modal Hierarchical 64/8/1 Replay at 2M-Unique / 1B-Processed (Quick Turnover)
+
+**Date:** 2026-06-16
+**Hypothesis:** Running the same hierarchical `2M/1B` configuration on Modal T4 (detached) will reduce wall-clock and improve iteration speed versus local MPS while preserving stability.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_t4.yaml` + overrides (`max_steps=30518`, `decode_mirror.enabled=true`, `next_token_supervision.enabled=true`, `diversity_regularization.enabled=false`) (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Systems Analysis)
+
+### Success Criteria
+- Detached launch succeeds on `qrk-labs`.
+- Training remains stable (`nan_batches=0`, no non-finite loss).
+- End-to-end wall-clock beats local MPS replay.
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| stable / nan_batches | train stage |
+| val_loss / val_diffusion_loss / val_next_token_acc | train stage |
+| total wall-clock | run summary |
+
+### Decisions
+- [x] Stop local EXP-055 run and migrate execution to Modal.
+- [x] Keep hierarchical structure and decode mirror path.
+- [x] Keep diversity regularization disabled.
+- [ ] Launch detached run and capture app id + log contract.
+- [ ] Compare runtime and quality vs local EXP-055.
+
+### Status: [RUNNING]
+
+### Launch Details (EXP-056)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-a041yxbmSyz0OaOTfEcqUE` |
+| Run ID | `exp056_modal_hier_2m1b_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_t4` |
+| Overrides | `fp16_chunk.training.max_steps=30518 fp16_chunk.training.val_check_interval=1000 fp16_chunk.training.checkpoint_every_n_train_steps=2000 fp16_chunk.decode_mirror.enabled=true fp16_chunk.decode_mirror.next_token_supervision.enabled=true fp16_chunk.decode_mirror.diversity_regularization.enabled=false fp16_chunk.training.precision=16-mixed` |
+| Early throughput | `step=600`, `sps≈19.91`, `eta≈25.0 min` |
+| Launch contract | `experiments/modal_launches/20260616_0014_exp056_modal_hier_2m1b_001.json` |
+
+### Results
+| Metric | Value | Target / Reference | Delta |
+|--------|-------|--------------------|-------|
+| run state | `stopped` (2026-06-16 00:43:49 +01:00) | detached completion | pass |
+| stable | `true` | `true` | pass |
+| nan_batches | `0` | `0` | pass |
+| val_loss_first | `1.13114` | lower is better | — |
+| val_loss_last | `0.92662` | downward trend | `-0.20452` |
+| val_trend_pass | `true` | `true` | pass |
+| val_diffusion_loss_last | `0.03158` | lower is better | — |
+| val_next_token_acc_last | `0.00277` | monitor | — |
+| steps_per_sec | `18.57` | local EXP-055 (~`3.06` around step 1040) | `~6.1x` faster |
+| raw_tokens_per_sec | `608,415.08` | higher is better | — |
+| train_chunks / val_chunks | `29381 / 5063` | expected 2M/1B profile | pass |
+| best checkpoint | `best-step-0030000.ckpt` | present | pass |
+| interaction probe coherent_rate | `0.00` (`0/100`) | higher is better | fail |
+| interaction probe strict_coherent_rate | `0.00` (`0/100`) | higher is better | fail |
+| interaction probe rubric_avg_score | `5.99` | higher is better | mixed |
+| interaction probe unique_continuations | `91` | avoid collapse | pass |
+| interaction probe dominant_continuation_share | `0.03` | low preferred | pass |
+| interaction probe mojibake_rows | `0` | `0` preferred | pass |
+
+### Key Observations
+- Systems goal succeeded: Modal run completed quickly with strong throughput and stable optimization.
+- Quality goal did not succeed: coherence remained `0/100` despite high diversity and no mojibake, suggesting outputs are varied but semantically non-compliant with the strict prompt-following probe.
+- Throughput gain vs local MPS replay is substantial (`~6x` at comparable observed points), confirming Modal as the right fast-turnover environment for this track.
+
+### Decisions
+- [x] Launch detached run and capture app id + log contract.
+- [x] Compare runtime and quality vs local EXP-055.
+- [x] Run fixed-set 100-prompt interaction probe on best checkpoint (`best-step-0030000.ckpt`).
+- [ ] Apply simpler flat-scalar control experiment in Modal to isolate whether hierarchy is the dominant coherence failure source.
+
+### Status: [COMPLETE]
+
+## EXP-058: Modal Hierarchical 64/8/1 at 2M/1B with No-Memory Decode-8 Head
+
+**Date:** 2026-06-16
+**Hypothesis:** A sparse no-memory decode head that predicts token embeddings at 8-token intervals (with deterministic nearest-position densification during inference decode) will preserve EXP-057 throughput/stability while restoring a clean non-memory interaction path.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_decode8_t4.yaml` + launch overrides (`max_steps=30518`, `val_check_interval=1000`, `checkpoint_every_n_train_steps=2000`) (commit: working tree)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Detached launch succeeds on `qrk-labs`.
+- Training remains stable (`nan_batches=0`, no non-finite loss).
+- Validation trend remains downward.
+- Fixed-set interaction probe can run in `mirror_decoder` mode (no memory lookup).
+
+### Planned Metrics
+| Metric | Capture |
+|--------|---------|
+| stable / nan_batches | train stage |
+| val_loss_first / val_loss_last | train stage |
+| val_next_token_acc_last | train stage |
+| steps_per_sec / raw_tokens_per_sec | train stage |
+| fixed-set coherence (mirror_decoder) | probe stage |
+
+### Decisions
+- [x] Add deterministic sparse-position densification in decode fusion for inference decode.
+- [x] Add focused unit test for sparse decode positions.
+- [x] Add dedicated decode-8 modal config.
+- [x] Launch detached Modal run.
+- [x] Run fixed-set 100 prompt probe in `mirror_decoder` mode.
+
+### Status: [RUNNING]
+
+### Launch Details (EXP-058)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-OKC2P7LlkovnyjDII1RBJL` |
+| Run ID | `exp058_modal_hier_decode8_2m1b_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_decode8_t4` |
+| Overrides | `fp16_chunk.training.max_steps=30518 fp16_chunk.training.val_check_interval=1000 fp16_chunk.training.checkpoint_every_n_train_steps=2000` |
+| Launch contract | `experiments/modal_launches/20260616_0700_exp058_modal_hier_decode8_2m1b_001.json` |
+
+### Results (EXP-058)
+| Metric | Value | Target | Pass |
+|--------|-------|--------|------|
+| run state | `stopped` (`2026-06-16 07:35:43 +01:00`) | detached completion | Yes |
+| stable | `true` | `true` | Yes |
+| nan_batches | `0` | `0` | Yes |
+| val_loss_first -> last | `2.1850 -> 1.8427` | downward trend | Yes |
+| val_diffusion_loss_last | `0.03278` | report | N/A |
+| val_next_token_acc_last | `0.00772` | monitor | N/A |
+| steps_per_sec | `19.76` | near prior modal runs | Yes |
+| raw_tokens_per_sec | `647,510.60` | >= 75% of EXP-057 (`777,825.97`) | Yes |
+| fixed-set probe (best ckpt, mirror_decoder) coherent/strict | `0.00 / 0.00` | improve vs fail baseline | No |
+| fixed-set probe (last ckpt, mirror_decoder) coherent/strict | `0.00 / 0.00` | improve vs fail baseline | No |
+| fixed-set probe unique continuations | `1` | avoid collapse | No |
+| fixed-set probe dominant share | `1.00` | low dominance | No |
+
+### Key Observations (EXP-058)
+- Systems behavior remained healthy (stable training, acceptable throughput), but output quality collapsed fully under no-memory mirror decoding.
+- Early checkpoint selection by `val/next_token_acc` did not prevent behavioral collapse (`best-step-0001000` and `last` both fail identically on fixed-set probe).
+- Decode-8 sparse anchor alone is not sufficient for coherence under current objective mix.
+
+### Decisions (EXP-058)
+- [x] Finish run and pull artifacts.
+- [x] Run fixed-set 100 prompt no-memory probe (`mirror_decoder`) on best checkpoint.
+- [x] Run fixed-set 100 prompt no-memory probe on `last` checkpoint for sanity check.
+- [x] Mark Track A baseline as failed on coherence gate.
+- [x] Proceed to Phase 1 screening for Tracks A/B/C with unified `output_head` implementation.
+
+### Status: [COMPLETE]
+
+## EXP-059: Phase 1 Screening — Track A (anchor_sparse, decode-8) @ 6k
+
+**Date:** 2026-06-16
+**Hypothesis:** Re-running Track A with the unified `output_head` implementation will preserve throughput and may improve no-memory coherence relative to EXP-058.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_decode8_t4.yaml` + overrides (`max_steps=6000`, `val_check_interval=500`, `checkpoint_every_n_train_steps=1000`) (commit: working tree)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Status: [COMPLETE]
+
+### Launch Details (EXP-059)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-BfesiX2cU29ggwTLmNwrvh` |
+| Run ID | `exp059_modal_output_head_anchor_sparse_6k_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_decode8_t4` |
+| Overrides | `fp16_chunk.training.max_steps=6000 fp16_chunk.training.val_check_interval=500 fp16_chunk.training.checkpoint_every_n_train_steps=1000 fp16_chunk.training.precision=16-mixed` |
+| Launch contract | `experiments/modal_launches/20260616_0744_exp059_modal_output_head_anchor_sparse_6k_001.json` |
+
+### Results (EXP-059)
+| Metric | Value |
+|--------|-------|
+| stable / nan_batches | `true` / `0` |
+| val_loss_first -> val_loss_last | `2.24999 -> 1.94120` |
+| val_next_token_acc_last | `0.05875` |
+| val_next_chunk_acc_last | `null` |
+| steps_per_sec / raw_tokens_per_sec | `17.55` / `575,095.52` |
+| output_head_family | `anchor_sparse` |
+| probe(best) coherent/strict | `0.00 / 0.00` |
+| probe(last) coherent/strict | `0.00 / 0.00` |
+| probe(best) dominant_share / unique | `1.00` / `1` |
+
+### Key Observations (EXP-059)
+- Training remained stable and token-CE metric improved versus EXP-058.
+- No-memory mirror decoding still collapsed completely to one continuation on fixed-set probe.
+
+## EXP-060: Phase 1 Screening — Track B (anchor_refine, decode-4 + refiner) @ 6k
+
+**Date:** 2026-06-16
+**Hypothesis:** Dense anchors plus a lightweight local refiner improve strict coherence over Track A with acceptable throughput cost.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_anchor_refine_t4.yaml` + overrides (`max_steps=6000`, `val_check_interval=500`, `checkpoint_every_n_train_steps=1000`) (commit: working tree)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Status: [COMPLETE]
+
+### Launch Details (EXP-060)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-VV0WPOTCLjfkdmTB6F785r` |
+| Run ID | `exp060_modal_output_head_anchor_refine_6k_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_anchor_refine_t4` |
+| Overrides | `fp16_chunk.training.max_steps=6000 fp16_chunk.training.val_check_interval=500 fp16_chunk.training.checkpoint_every_n_train_steps=1000 fp16_chunk.training.precision=16-mixed` |
+| Launch contract | `experiments/modal_launches/20260616_0745_exp060_modal_output_head_anchor_refine_6k_001.json` |
+
+### Results (EXP-060)
+| Metric | Value |
+|--------|-------|
+| stable / nan_batches | `true` / `0` |
+| val_loss_first -> val_loss_last | `3.27013 -> 2.87175` |
+| val_next_token_acc_last | `0.06633` |
+| val_next_chunk_acc_last | `null` |
+| steps_per_sec / raw_tokens_per_sec | `18.16` / `595,047.86` |
+| output_head_family | `anchor_refine` |
+| probe(best) coherent/strict | `0.00 / 0.00` |
+| probe(last) coherent/strict | `0.00 / 0.00` |
+| probe(best) dominant_share / unique | `1.00` / `1` |
+
+### Key Observations (EXP-060)
+- Track B achieved the highest `val_next_token_acc_last` and throughput among Phase 1 tracks.
+- Refiner path did not translate to behavioral gains; fixed-set no-memory decoding still fully collapsed.
+
+## EXP-061: Phase 1 Screening — Track C (dual_task chunk+token CE) @ 6k
+
+**Date:** 2026-06-16
+**Hypothesis:** Dual-task chunk+token supervision improves semantic consistency and strict coherence over single-head tracks.
+**Config:** `configs/fp16_hierarchical_64_8_1_modal_dual_task_t4.yaml` + overrides (`max_steps=6000`, `val_check_interval=500`, `checkpoint_every_n_train_steps=1000`) (commit: working tree)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Status: [COMPLETE]
+
+### Launch Details (EXP-061)
+| Field | Value |
+|------|-------|
+| Modal profile | `qrk-labs` |
+| App ID | `ap-EDbTlDW5RegdRXw0GvtxE6` |
+| Run ID | `exp061_modal_output_head_dual_task_6k_001` |
+| Config | `fp16_hierarchical_64_8_1_modal_dual_task_t4` |
+| Overrides | `fp16_chunk.training.max_steps=6000 fp16_chunk.training.val_check_interval=500 fp16_chunk.training.checkpoint_every_n_train_steps=1000 fp16_chunk.training.precision=16-mixed` |
+| Launch contract | `experiments/modal_launches/20260616_0746_exp061_modal_output_head_dual_task_6k_001.json` |
+
+### Results (EXP-061)
+| Metric | Value |
+|--------|-------|
+| stable / nan_batches | `true` / `0` |
+| val_loss_first -> val_loss_last | `4.87275 -> 4.41937` |
+| val_next_token_acc_last | `0.05875` |
+| val_next_chunk_acc_last | `0.03402` |
+| steps_per_sec / raw_tokens_per_sec | `17.18` / `562,849.76` |
+| output_head_family | `dual_task` |
+| probe(best) coherent/strict | `0.00 / 0.00` |
+| probe(last) coherent/strict | `0.00 / 0.00` |
+| probe(best) dominant_share / unique | `1.00` / `1` |
+
+### Key Observations (EXP-061)
+- Dual-task supervision produced chunk-level metric signal (`val_next_chunk_acc_last`) as intended.
+- Despite improved training instrumentation, no-memory decode behavior remained collapsed on fixed-set probe.
+
+## EXP-062: Phase 2 Selection — Ranking and Top-2 Selection from EXP-059/060/061
+
+**Date:** 2026-06-16
+**Hypothesis:** Coherence-first ranking over fixed-set no-memory probes will identify the top two tracks for confirmation runs.
+**Inputs:** `EXP-059`, `EXP-060`, `EXP-061` artifacts and probes.
+**Ranking Script:** `scripts/rank_output_head_experiments.py`
+**Output:** `research/eval/output_head_phase1_ranking_exp059_061.json`
+
+### Results
+| Rank | Run | Family | strict_coherent_rate | coherent_rate | val_next_token_acc_last | raw_tokens_per_sec |
+|------|-----|--------|----------------------|---------------|-------------------------|--------------------|
+| 1 | `exp060_modal_output_head_anchor_refine_6k_001` | `anchor_refine` | `0.00` | `0.00` | `0.06633` | `595,047.86` |
+| 2 | `exp059_modal_output_head_anchor_sparse_6k_001` | `anchor_sparse` | `0.00` | `0.00` | `0.05875` | `575,095.52` |
+| 3 | `exp061_modal_output_head_dual_task_6k_001` | `dual_task` | `0.00` | `0.00` | `0.05875` | `562,849.76` |
+
+### Gate Outcome
+- No Phase 1 candidate passed coherence gate (`strict_coherent_rate >= 0.25` and `coherent_rate >= 0.50`).
+- Top-2 by tie-break order are still `EXP-060` and `EXP-059`, but both are currently non-viable for Phase 3 confirmation without architecture changes.
+
+### Status: [COMPLETE]

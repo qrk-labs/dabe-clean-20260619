@@ -1,0 +1,62 @@
+defaults:
+  - feasibility
+  - _self_
+
+experiment:
+  name: "feasibility_modal_olmo_scale_v1"
+  track: "feasibility"
+  feasibility_stage: "all"
+  seed: 42
+  device: "auto"
+  train: true
+
+router:
+  min_bit_width: 10
+  max_bit_width: 24
+
+encoder:
+  embed_dim: 224
+  vocab_size: 6144
+
+backbone:
+  hidden_dim: 384
+  num_layers: 4
+  num_heads: 6
+  ff_dim: 1536
+  vocab_size: 6144
+
+training:
+  learning_rate: 2.5e-4
+  weight_decay: 0.01
+  max_epochs: 1
+  batch_size: 8
+
+feasibility:
+  tokenizer_training:
+    dataset_name: "allenai/olmo-mix-1124"
+    train_split: "train"
+    eval_split: "train"
+    train_samples: 3072
+    eval_samples: 384
+    vocab_size: 6144
+    epochs: 1
+    batch_size: 256
+    learning_rate: 8e-4
+    device: "cpu"
+    text_field: "text"
+    allow_synthetic_fallback: false
+  lm_data:
+    dataset_name: "allenai/olmo-mix-1124"
+    train_split: "train"
+    val_split: "train"
+    train_samples: 4096
+    val_samples: 512
+    seq_len: 64
+    text_field: "text"
+    allow_synthetic_fallback: false
+  decision_gate:
+    loss_tolerance_ratio: 0.2
+    min_compression_ratio: 1.0
+
+evaluation:
+  save_top_k: 0

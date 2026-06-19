@@ -1,0 +1,93 @@
+{
+  "run_id": "fp16_chunk_best64_100m_unique_20260614_001248",
+  "experiment": "fp16_chunk_best64_100m_unique",
+  "track": "fp16_chunk_feasibility",
+  "config": {
+    "experiment": {
+      "name": "fp16_chunk_best64_100m_unique",
+      "seed": 42,
+      "device": "auto"
+    },
+    "fp16_chunk": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 560000,
+        "val_samples": 10000,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "compression": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "window_overlap": 0,
+        "dtype": "float16",
+        "tokenizer_batch_size": 64
+      },
+      "model": {
+        "hidden_dim": 256,
+        "num_layers": 4,
+        "num_heads": 4,
+        "ff_dim": 1024,
+        "dropout": 0.1,
+        "attention": {
+          "backend": "auto"
+        }
+      },
+      "training": {
+        "compressed_seq_len": 8,
+        "window_stride": 1,
+        "batch_size": 64,
+        "num_workers": 0,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "max_steps": 12000,
+        "val_check_interval": 200,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 20,
+        "precision": "32-true"
+      },
+      "diffusion": {
+        "enabled": true,
+        "latent_dim": 128,
+        "timesteps": 256,
+        "loss_weight": 0.25,
+        "reconstruction_weight": 0.2,
+        "vocab_size": 50257,
+        "chunk_size_tokens": 64
+      },
+      "gate": {
+        "require_stable": true,
+        "require_downward_trend": true,
+        "min_relative_drop": 0.0
+      }
+    }
+  },
+  "fp16_chunk": {
+    "stable": true,
+    "nan_batches": 0,
+    "val_loss_first": 0.3182603418827057,
+    "val_loss_last": 0.31759533286094666,
+    "val_trend_pass": true,
+    "diffusion_enabled": true,
+    "val_diffusion_loss_last": 1.26915442943573,
+    "val_gist_cosine_last": 0.036378081887960434,
+    "val_gist_retrieval_top1_last": 0.0021042046137154102,
+    "first_batch_seconds": 0.8274415829218924,
+    "steps_per_sec": 10.426180976523485,
+    "compressed_tokens_per_sec": 5338.204659980024,
+    "raw_tokens_per_sec": 341645.09823872155,
+    "gpu_mem_peak_mb": 0.0,
+    "cpu_util_avg": 73.11174062093099,
+    "gpu_util_avg": null,
+    "device": "mps:0",
+    "train_samples": 1678904,
+    "val_samples": 26851,
+    "train_chunks": 1678912,
+    "val_chunks": 26859,
+    "gate_pass": true
+  }
+}

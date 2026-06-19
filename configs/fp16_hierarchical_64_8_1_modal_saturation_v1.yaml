@@ -1,0 +1,45 @@
+defaults:
+  - fp16_hierarchical_64_8_1_modal_t4
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_modal_saturation_v1"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  dataset:
+    train_samples: 20000
+    val_samples: 4096
+
+  model:
+    hidden_dim: 768
+    num_layers: 12
+    num_heads: 12
+    ff_dim: 3072
+    dropout: 0.1
+
+  training:
+    compressed_seq_len: 16
+    batch_size: 1024
+    num_workers: 8
+    learning_rate: 3e-4
+    weight_decay: 0.01
+    max_steps: 91554
+    val_check_interval: 4000
+    log_every_n_steps: 50
+    eta_log_interval_steps: 200
+    checkpoint_every_n_train_steps: 10000
+    checkpoint_save_top_k: 1
+    checkpoint_save_last: true
+    precision: "bf16-mixed"
+    eta_stdout: true
+
+  diffusion:
+    enabled: true
+    latent_dim: 512
+    timesteps: 256
+    loss_weight: 0.25
+    reconstruction_weight: 0.2
+    chunk_size_tokens: 64
+    compute_train_gist_metrics: false

@@ -1,0 +1,44 @@
+defaults:
+  - feasibility_metal_opt_v1
+  - _self_
+
+experiment:
+  name: "feasibility_standard_dabe_metal_opt_v2"
+  track: "feasibility"
+  feasibility_stage: "all"
+  seed: 42
+  device: "auto"
+  train: true
+
+router:
+  min_bit_width: 11
+  max_bit_width: 24
+
+encoder:
+  embed_dim: 384
+  vocab_size: 10240
+
+backbone:
+  hidden_dim: 704
+  num_layers: 6
+  num_heads: 8
+  ff_dim: 2816
+  vocab_size: 10240
+
+training:
+  learning_rate: 1.8e-4
+  weight_decay: 0.004
+  max_epochs: 3
+  batch_size: 4
+
+feasibility:
+  tokenizer_training:
+    vocab_size: 10240
+    epochs: 4
+    learning_rate: 6e-4
+  decision_gate:
+    loss_tolerance_ratio: 0.1
+    min_compression_ratio: 1.0
+
+evaluation:
+  save_top_k: 0

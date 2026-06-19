@@ -1,0 +1,71 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_3b_total
+  - _self_
+
+experiment:
+  name: "fp16_hierarchical_64_8_1_exp031_seed"
+  seed: 42
+  device: "auto"
+
+fp16_chunk:
+  compression:
+    chunk_size_tokens: 64
+    window_overlap: 0
+
+  hierarchical:
+    enabled: true
+    coarse_chunk_size: 64
+    mid_chunk_size: 8
+    fine_chunk_size: 1
+    router_temperature: 1.0
+    hard_routing: false
+    route_balance_weight: 0.02
+    route_entropy_weight: 0.0
+    route_target: [0.55, 0.30, 0.15]
+    base_residual_weight: 0.15
+
+  diffusion:
+    enabled: true
+    chunk_size_tokens: 64
+
+  output_head:
+    enabled: false
+    family: "anchor_sparse"
+    anchor_stride: 8
+    refiner:
+      enabled: false
+    loss_weights:
+      token_ce: 0.1
+      chunk_ce: 0.0
+      diffusion: 0.25
+
+  decode_mirror:
+    enabled: false
+    coarse_stride: 8
+    mid_stride: 4
+    fine_stride: 1
+    loss_weight: 0.1
+    coarse_weight: 0.2
+    mid_weight: 0.3
+    fine_weight: 0.5
+    scalar_mid_weight: 0.25
+    scalar_fine_weight: 0.25
+    infer_coarse_weight: 0.2
+    infer_mid_weight: 0.3
+    infer_fine_weight: 0.5
+    next_token_supervision:
+      enabled: false
+      loss_weight: 0.1
+      sample_batch_size: 4
+      position_stride: 8
+      max_positions: 8
+    diversity_regularization:
+      enabled: false
+      loss_weight: 0.05
+      sample_batch_size: 4
+      temperature: 1.0
+      entropy_target: 6.0
+      entropy_weight: 1.0
+      top1_max: 0.35
+      top1_weight: 1.0
+      adjacent_similarity_weight: 0.1

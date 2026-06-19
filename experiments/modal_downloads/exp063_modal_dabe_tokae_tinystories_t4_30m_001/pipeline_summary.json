@@ -1,0 +1,73 @@
+{
+  "status": "ok",
+  "run_id": "exp063_modal_dabe_tokae_tinystories_t4_30m_001",
+  "output_dir": "/vol/experiments/exp063_modal_dabe_tokae_tinystories_t4_30m_001",
+  "config_name": "dabe_tokenizer_autoencoder_smoke",
+  "overrides": "dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.training.max_steps=2000 dabe_tokenizer.training.val_check_interval=100 dabe_tokenizer.training.checkpoint_every_n_train_steps=500 dabe_tokenizer.training.batch_size=16 dabe_tokenizer.training.enable_progress_bar=false experiment.device=cuda dabe_tokenizer.training.precision=bf16-mixed dabe_tokenizer.training.num_workers=4",
+  "config": {
+    "experiment": {
+      "name": "dabe_tokenizer_autoencoder_smoke",
+      "seed": 42,
+      "device": "cuda"
+    },
+    "dabe_tokenizer": {
+      "dataset": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 4096,
+        "val_samples": 512,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": true
+      },
+      "codec": {
+        "tokenizer_name": "gpt2",
+        "force_fast_tokenizer": true,
+        "chunk_size_tokens": 64,
+        "chunk_stride_tokens": 64,
+        "code_bits": 256,
+        "tokenizer_batch_size": 32
+      },
+      "model": {
+        "embed_dim": 64,
+        "hidden_dim": 256,
+        "dropout": 0.0
+      },
+      "training": {
+        "batch_size": 16,
+        "num_workers": 4,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.01,
+        "bit_balance_weight": 0.01,
+        "max_steps": 2000,
+        "val_check_interval": 100,
+        "grad_clip": 1.0,
+        "log_every_n_steps": 5,
+        "enable_csv_logger": true,
+        "enable_progress_bar": false,
+        "checkpoint_every_n_train_steps": 500,
+        "checkpoint_save_top_k": 1,
+        "checkpoint_save_last": true,
+        "precision": "bf16-mixed"
+      }
+    }
+  },
+  "result": {
+    "train": {
+      "stable": true,
+      "nan_batches": 0,
+      "train_chunks": 11269,
+      "val_chunks": 1351,
+      "chunk_size_tokens": 64,
+      "code_bits": 256,
+      "bits_per_token": 4.0,
+      "val_loss_first": 10.814977645874023,
+      "val_loss_last": 4.6656599044799805,
+      "val_token_acc_last": 0.24013462662696838,
+      "val_exact_chunk_acc_last": 0.0,
+      "val_bit_density_last": 0.4827095568180084,
+      "best_checkpoint_path": "/__modal/volumes/vo-9otxL0ZCGnatCiWX8vWfRg/experiments/exp063_modal_dabe_tokae_tinystories_t4_30m_001/checkpoints/best-step-0002000.ckpt"
+    }
+  }
+}

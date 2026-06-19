@@ -1,0 +1,104 @@
+experiment:
+  name: exp055_local_hier_2m1b
+  seed: 42
+  device: auto
+fp16_chunk:
+  dataset:
+    dataset_name: roneneldan/TinyStories
+    train_split: train
+    val_split: validation
+    train_samples: 10500
+    val_samples: 2048
+    text_field: text
+    allow_synthetic_fallback: false
+    streaming: true
+  compression:
+    tokenizer_name: gpt2
+    force_fast_tokenizer: true
+    chunk_size_tokens: 64
+    window_overlap: 0
+    dtype: float16
+    tokenizer_batch_size: 64
+  model:
+    hidden_dim: 256
+    num_layers: 4
+    num_heads: 4
+    ff_dim: 1024
+    dropout: 0.1
+    attention:
+      backend: auto
+  training:
+    compressed_seq_len: 8
+    window_stride: 1
+    batch_size: 64
+    num_workers: 8
+    learning_rate: 0.0003
+    weight_decay: 0.01
+    max_steps: 30518
+    val_check_interval: 1000
+    grad_clip: 1.0
+    log_every_n_steps: 20
+    eta_log_interval_steps: 20
+    enable_csv_logger: true
+    checkpoint_every_n_train_steps: 2000
+    checkpoint_save_top_k: 1
+    checkpoint_save_last: true
+    precision: 32-true
+  diffusion:
+    enabled: true
+    latent_dim: 128
+    timesteps: 256
+    loss_weight: 0.25
+    reconstruction_weight: 0.2
+    vocab_size: 50257
+    chunk_size_tokens: 64
+  gate:
+    require_stable: true
+    require_downward_trend: true
+    min_relative_drop: 0.0
+  hierarchical:
+    enabled: true
+    coarse_chunk_size: 64
+    mid_chunk_size: 8
+    fine_chunk_size: 1
+    router_temperature: 1.0
+    hard_routing: false
+    route_balance_weight: 0.02
+    route_entropy_weight: 0.0
+    route_target:
+    - 0.55
+    - 0.3
+    - 0.15
+    base_residual_weight: 0.15
+  decode_mirror:
+    enabled: true
+    coarse_stride: 8
+    mid_stride: 4
+    fine_stride: 1
+    loss_weight: 0.1
+    coarse_weight: 0.2
+    mid_weight: 0.3
+    fine_weight: 0.5
+    scalar_mid_weight: 0.25
+    scalar_fine_weight: 0.25
+    infer_coarse_weight: 0.2
+    infer_mid_weight: 0.3
+    infer_fine_weight: 0.5
+    next_token_supervision:
+      enabled: true
+      loss_weight: 0.1
+      sample_batch_size: 4
+      position_stride: 8
+      max_positions: 8
+    diversity_regularization:
+      enabled: false
+      loss_weight: 0.05
+      sample_batch_size: 4
+      temperature: 1.0
+      entropy_target: 6.0
+      entropy_weight: 1.0
+      top1_max: 0.35
+      top1_weight: 1.0
+      adjacent_similarity_weight: 0.1
+fp16_chunk_modal:
+  use_memmap: true

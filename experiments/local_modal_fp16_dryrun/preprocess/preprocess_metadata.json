@@ -1,0 +1,15 @@
+{
+  "run_id": "local_modal_fp16_dryrun",
+  "diffusion_enabled": false,
+  "chunk_size_tokens": 64,
+  "tokenizer_batch_size": 64,
+  "train_text_samples": 128,
+  "val_text_samples": 64,
+  "train_chunks": 324,
+  "val_chunks": 143,
+  "train_scalars_path": "/Users/mainasaratsowa/code/qrk/dabe/experiments/local_modal_fp16_dryrun/artifacts/preprocessed/train_scalars.npy",
+  "val_scalars_path": "/Users/mainasaratsowa/code/qrk/dabe/experiments/local_modal_fp16_dryrun/artifacts/preprocessed/val_scalars.npy",
+  "train_chunk_tokens_path": null,
+  "val_chunk_tokens_path": null,
+  "preprocess_seconds": 55.59373362502083
+}

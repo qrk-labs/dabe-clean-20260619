@@ -1,0 +1,60 @@
+experiment:
+  name: "fixed_width_bitmask"
+  seed: 42
+  device: "auto"
+  train: true
+
+tokenization:
+  type: "bitmask"
+  fixed_bit_width: 32
+
+router:
+  type: "fixed"
+  min_bit_width: 32
+  max_bit_width: 32
+  num_header_bits: 4
+
+encoder:
+  type: "lfq"
+  max_bit_width: 32
+  num_header_bits: 4
+  embed_dim: 256
+  num_codes: 32
+
+backbone:
+  type: "dabe_transformer"
+  hidden_dim: 512
+  num_layers: 6
+  num_heads: 8
+  ff_dim: 2048
+  dropout: 0.1
+  max_seq_len: 512
+  vocab_size: 32000
+  max_bit_width: 36
+
+training:
+  learning_rate: 1e-4
+  weight_decay: 0.01
+  max_epochs: 10
+  batch_size: 16
+  grad_clip: 1.0
+  warmup_steps: 1000
+  recon_weight: 1.0
+  contrastive_weight: 0.1
+  contrastive_temperature: 0.07
+  contrastive_margin: 0.5
+
+data:
+  source_langs: ["en", "fr", "es", "de", "zh"]
+  target_langs: ["en", "fr", "es", "de", "zh"]
+  max_samples: 100000
+  num_workers: 0
+
+logging:
+  wandb_project: "dabe"
+  wandb_entity: null
+  log_every_n_steps: 10
+
+evaluation:
+  eval_every_n_steps: 500
+  save_every_n_epochs: 1

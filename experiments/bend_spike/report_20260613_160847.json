@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-06-13T16:08:47.210110+00:00",
+  "candidate": "equivalent_runtime_vectorized_python",
+  "bend_available": false,
+  "bend_status": "not_run",
+  "speedup_vs_baseline": 1.244868235601091,
+  "deterministic_parity": true,
+  "integration_overhead_hours": 0.5,
+  "go": false,
+  "criteria": {
+    "speedup_min": 1.5,
+    "integration_overhead_hours_max": 1.0,
+    "deterministic_parity_required": true
+  }
+}

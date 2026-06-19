@@ -1,0 +1,183 @@
+{
+  "run_id": "feasibility_standard_dabe_metal_reentry_20260611_192149",
+  "experiment": "feasibility_standard_dabe_metal_reentry",
+  "track": "feasibility",
+  "config": {
+    "experiment": {
+      "name": "feasibility_standard_dabe_metal_reentry",
+      "seed": 42,
+      "device": "auto",
+      "train": true,
+      "track": "feasibility",
+      "feasibility_stage": "all"
+    },
+    "tokenization": {
+      "type": "density_adaptive_bitmask"
+    },
+    "router": {
+      "type": "entropy",
+      "hidden_dim": 128,
+      "num_layers": 1,
+      "density_lower": 0.0,
+      "density_upper": 1.0,
+      "min_bit_width": 8,
+      "max_bit_width": 24,
+      "num_header_bits": 4,
+      "lm_model": "distilbert-base-uncased",
+      "stride": 1,
+      "segment_stride": 1
+    },
+    "encoder": {
+      "type": "lfq",
+      "max_bit_width": 24,
+      "num_header_bits": 4,
+      "embed_dim": 256,
+      "num_codes": 24,
+      "vocab_size": 8192,
+      "lower_case": true
+    },
+    "backbone": {
+      "type": "dabe_transformer",
+      "hidden_dim": 512,
+      "num_layers": 6,
+      "num_heads": 8,
+      "ff_dim": 2048,
+      "dropout": 0.1,
+      "max_seq_len": 256,
+      "vocab_size": 8192,
+      "max_bit_width": 28
+    },
+    "training": {
+      "learning_rate": 0.0003,
+      "weight_decay": 0.01,
+      "max_epochs": 1,
+      "batch_size": 4,
+      "grad_clip": 1.0,
+      "warmup_steps": 50,
+      "recon_weight": 1.0,
+      "contrastive_weight": 0.05,
+      "contrastive_temperature": 0.07,
+      "contrastive_margin": 0.5,
+      "early_stop_patience": 2
+    },
+    "data": {
+      "dataset_name": "unimelb-nlp/wikiann",
+      "synthetic_only": false,
+      "source_langs": [
+        "en",
+        "fr"
+      ],
+      "target_langs": [
+        "en",
+        "fr"
+      ],
+      "max_samples": 256,
+      "num_workers": 0
+    },
+    "logging": {
+      "wandb_project": "dabe-feasibility",
+      "wandb_entity": null,
+      "wandb_mode": "offline",
+      "log_every_n_steps": 5
+    },
+    "evaluation": {
+      "eval_every_n_steps": 100,
+      "save_every_n_epochs": 1
+    },
+    "feasibility": {
+      "bpe_model_name": "gpt2",
+      "baseline_backbone": {
+        "hidden_dim": 320,
+        "num_layers": 6,
+        "num_heads": 5,
+        "ff_dim": 1280,
+        "tie_weights": true
+      },
+      "tokenizer_training": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "eval_split": "validation",
+        "train_samples": 512,
+        "eval_samples": 128,
+        "vocab_size": 8192,
+        "epochs": 1,
+        "batch_size": 256,
+        "learning_rate": 0.001,
+        "device": "cpu"
+      },
+      "lm_data": {
+        "dataset_name": "roneneldan/TinyStories",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 512,
+        "val_samples": 128,
+        "seq_len": 64
+      },
+      "decision_gate": {
+        "loss_tolerance_ratio": 0.15,
+        "min_compression_ratio": 1.0
+      }
+    }
+  },
+  "feasibility": {
+    "track": "feasibility",
+    "stage": "all",
+    "tokenizer": {
+      "artifact_path": "experiments/feasibility_standard_dabe_metal_reentry_20260611_192149/artifacts/lfq_tokenizer.pt",
+      "vocab_size": 6779,
+      "avg_train_loss": 5.898533070471979,
+      "compression_ratio_vs_bpe": 1.245004245683555,
+      "density_distribution": {
+        "width_8": 0.957226411995806,
+        "width_9": 0.025542880964111114,
+        "width_10": 0.0059877970212604695,
+        "width_11": 0.0019454024077512917,
+        "width_12": 0.0006947865741968899,
+        "width_13": 0.000568461742524728,
+        "width_14": 0.0003284445623476207,
+        "width_15": 0.0002526496633443236,
+        "width_16": 0.00013895731483937798,
+        "width_17": 0.00013895731483937798,
+        "width_18": 3.789744950164854e-05,
+        "width_19": 0.00011369234850494561,
+        "width_20": 0.00011369234850494561,
+        "width_21": 0.00013895731483937798,
+        "width_22": 0.00021475221384267506,
+        "width_23": 6.31624158360809e-05,
+        "width_24": 0.006493096347949116
+      },
+      "hamming_same": {
+        "mean": 0.1360544217687075,
+        "min": 0.0,
+        "max": 17.0
+      },
+      "hamming_diff": {
+        "mean": 3.9433333333333334,
+        "min": 1.0,
+        "max": 16.0
+      }
+    },
+    "dabe_lm": {
+      "val_loss": 5.86798095703125,
+      "val_perplexity": 353.5344579233579,
+      "stable": true,
+      "train_samples": 1684,
+      "val_samples": 357
+    },
+    "bpe_baseline": {
+      "val_loss": 39.12484359741211,
+      "val_perplexity": 9.810783221738549e+16,
+      "stable": true,
+      "train_samples": 2350,
+      "val_samples": 496
+    },
+    "decision_gate": {
+      "dabe_val_loss": 5.86798095703125,
+      "bpe_val_loss": 39.12484359741211,
+      "compression_ratio_vs_bpe": 1.245004245683555,
+      "dabe_stable": true,
+      "bpe_stable": true,
+      "competitive": true
+    }
+  }
+}

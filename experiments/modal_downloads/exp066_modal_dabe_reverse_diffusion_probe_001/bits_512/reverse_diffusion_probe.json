@@ -1,0 +1,27 @@
+{
+  "checkpoint_path": "/vol/experiments/exp065_modal_dabe_tokae_diffusion_bits_sweep_001/bits_512/checkpoints/best-step-0006000.ckpt",
+  "max_batches": 64,
+  "sample_steps": 64,
+  "train_chunks": 11269,
+  "val_chunks": 1351,
+  "chunk_size_tokens": 64,
+  "code_bits": 512,
+  "bits_per_token": 8.0,
+  "decoder_mode": "diffusion",
+  "batches": 43,
+  "bit_density": 0.4369373009648434,
+  "one_step_tmax": {
+    "token_acc": 0.17770401554404144,
+    "token_top5_acc": 0.2580727239082161,
+    "token_top10_acc": 0.3077234455958549,
+    "exact_chunk_acc": 0.0,
+    "embed_mse": 241.81819239799222
+  },
+  "reverse_ddim": {
+    "token_acc": 0.1754718726868986,
+    "token_top5_acc": 0.2250532013323464,
+    "token_top10_acc": 0.24690044411547002,
+    "exact_chunk_acc": 0.0,
+    "embed_mse": 299.9333946064258
+  }
+}

@@ -1,0 +1,21 @@
+defaults:
+  - fp16_chunk_modal_2m_unique_1b_total
+  - _self_
+
+experiment:
+  name: "fp16_chunk_modal_20m_unique_10b_total"
+  seed: 42
+  device: "cuda"
+
+fp16_chunk:
+  dataset:
+    # 10x unique-token coverage target vs 2M run.
+    train_samples: 105000
+    # Keep validation size fixed for comparability and bounded eval overhead.
+    val_samples: 2048
+
+  training:
+    # 10x processed-token budget vs 1B run.
+    max_steps: 305180
+    val_check_interval: 5000
+    checkpoint_every_n_train_steps: 20000
