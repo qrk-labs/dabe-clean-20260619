@@ -1,5 +1,28 @@
 # Experiment Log
 
+## EXP-093: Fixed-Rate 20bpt No-Lookup Baseline
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-092 identified a cost-aware sparse-repair operating point at `20.06207` observed bits/token, but the paper needs a directly comparable standard learned-tokenizer baseline at the same bitrate. A `1280`-bit hierarchical-local no-lookup tokenizer (`1280 / 64 = 20.0` bits/token) should test whether DABE's gain comes from adaptive lexical repair rather than simply spending about `20` bits/token on a fixed-rate learned chunk code.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1280`, `hierarchical_block_tokens=16`, no sparse lookup path, TinyStories `4096/512`, `max_steps=12000`, `val_check_interval=300`, `checkpoint_every_n_train_steps=2000`, `batch_size=32`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` (commit: `a9540ef1ccad049482cc0eede7bbebc4120fe1f1`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run one sequential/single T4 job; no sweep and no new implementation surface.
+- Complete within the existing `1800s` function timeout or at least write usable checkpoint/metrics artifacts.
+- Match EXP-092's bitrate scale with a fixed-rate no-lookup baseline (`20.0` bits/token vs `20.06207` observed bits/token).
+- Log token accuracy, top-k accuracy, exact chunk/block metrics, bit density, and best checkpoint.
+- Paper-critical comparison: if quality remains near EXP-071/079 no-lookup baselines and below EXP-092/087, this strengthens the claim that sparse lexical repair is not just extra bitrate.
+
+### Decisions
+- [x] Use `hierarchical_local` as the standard fixed-rate learned chunk tokenizer comparator.
+- [x] Keep dataset, batch size, steps, and validation cadence aligned with EXP-092 for attribution.
+- [ ] Launch Modal run and capture launch contract.
+- [ ] Pull lightweight artifacts and update paper results table.
+
+### Status: [PLANNED]
+
 ## EXP-092: Cost-Knee Replication Sweep
 
 **Date:** 2026-06-19
