@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="620" viewBox="0 0 920 620">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<style>
+  .title { font-family: Georgia, serif; font-size: 22px; font-weight: 700; fill: #1e2724; }
+  .subtitle { font-family: Georgia, serif; font-size: 13px; fill: #65736f; }
+  .axis { stroke: #1e2724; stroke-width: 1.2; }
+  .grid { stroke: #d8ddd7; stroke-width: 1; }
+  .tick { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #65736f; }
+  .label { font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #1e2724; }
+  .small { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #65736f; }
+</style>
+<text x="90" y="38" class="title">Fig. 6. Active repair budget vs distortion</text>
+<text x="90" y="60" class="subtitle">Active lookup slots are useful, but router quality determines how much distortion each slot removes.</text>
+<line x1="90.0" y1="82" x2="90.0" y2="528" class="grid"/>
+<text x="90.0" y="552" text-anchor="middle" class="tick">3.1</text>
+<line x1="235.0" y1="82" x2="235.0" y2="528" class="grid"/>
+<text x="235.0" y="552" text-anchor="middle" class="tick">8.3</text>
+<line x1="380.0" y1="82" x2="380.0" y2="528" class="grid"/>
+<text x="380.0" y="552" text-anchor="middle" class="tick">13.6</text>
+<line x1="525.0" y1="82" x2="525.0" y2="528" class="grid"/>
+<text x="525.0" y="552" text-anchor="middle" class="tick">18.8</text>
+<line x1="670.0" y1="82" x2="670.0" y2="528" class="grid"/>
+<text x="670.0" y="552" text-anchor="middle" class="tick">24.1</text>
+<line x1="90" y1="528.0" x2="670" y2="528.0" class="grid"/>
+<text x="78" y="532.0" text-anchor="end" class="tick">5.27</text>
+<line x1="90" y1="416.5" x2="670" y2="416.5" class="grid"/>
+<text x="78" y="420.5" text-anchor="end" class="tick">5.77</text>
+<line x1="90" y1="305.0" x2="670" y2="305.0" class="grid"/>
+<text x="78" y="309.0" text-anchor="end" class="tick">6.26</text>
+<line x1="90" y1="193.5" x2="670" y2="193.5" class="grid"/>
+<text x="78" y="197.5" text-anchor="end" class="tick">6.75</text>
+<line x1="90" y1="82.0" x2="670" y2="82.0" class="grid"/>
+<text x="78" y="86.0" text-anchor="end" class="tick">7.24</text>
+<line x1="90" y1="528" x2="670" y2="528" class="axis"/>
+<line x1="90" y1="82" x2="90" y2="528" class="axis"/>
+<text x="380.0" y="590" text-anchor="middle" class="label">active lookup K</text>
+<text x="26" y="305.0" transform="rotate(-90 26 305.0)" text-anchor="middle" class="label">mean chunk deviation (lower is better)</text>
+<circle cx="708" cy="92" r="6" fill="#1f6f68"/>
+<text x="722" y="96" class="small">dabe</text>
+<circle cx="708" cy="114" r="6" fill="#d08a21"/>
+<text x="722" y="118" class="small">adaptive</text>
+<circle cx="522.4" cy="412.2" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="531.4" y="402.2" text-anchor="start" class="small">085-K12</text>
+<circle cx="578.4" cy="421.6" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="587.4" y="411.6" text-anchor="start" class="small">085-K16</text>
+<circle cx="630.0" cy="440.9" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="639.0" y="430.9" text-anchor="start" class="small">085-K20</text>
+<circle cx="171.9" cy="446.4" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="180.9" y="436.4" text-anchor="start" class="small">086</text>
+<circle cx="254.1" cy="497.2" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="263.1" y="487.2" text-anchor="start" class="small">087</text>
+<circle cx="266.9" cy="112.8" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="276.9" y="98.8" text-anchor="start" class="small">091-0.02</text>
+<circle cx="187.9" cy="167.6" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="175.9" y="185.6" text-anchor="end" class="small">091-0.025</text>
+<circle cx="148.6" cy="139.4" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="158.6" y="127.4" text-anchor="start" class="small">091-0.03</text>
+<circle cx="228.5" cy="164.8" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="240.5" y="140.8" text-anchor="start" class="small">092-0.0225</text>
+<circle cx="187.9" cy="167.6" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="199.9" y="185.6" text-anchor="start" class="small">092-0.025</text>
+<circle cx="130.0" cy="128.2" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="140.0" y="116.2" text-anchor="start" class="small">092-0.0275</text>
+</svg>

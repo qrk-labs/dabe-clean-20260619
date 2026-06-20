@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="620" viewBox="0 0 920 620">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<style>
+  .title { font-family: Georgia, serif; font-size: 22px; font-weight: 700; fill: #1e2724; }
+  .subtitle { font-family: Georgia, serif; font-size: 13px; fill: #65736f; }
+  .axis { stroke: #1e2724; stroke-width: 1.2; }
+  .grid { stroke: #d8ddd7; stroke-width: 1; }
+  .tick { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #65736f; }
+  .label { font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #1e2724; }
+  .small { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #65736f; }
+</style>
+<text x="90" y="38" class="title">Fig. 2. Rate-distortion frontier</text>
+<text x="90" y="60" class="subtitle">Higher token accuracy at a comparable or lower bitrate indicates a better tokenizer-autoencoder point.</text>
+<line x1="90.0" y1="82" x2="90.0" y2="528" class="grid"/>
+<text x="90.0" y="552" text-anchor="middle" class="tick">15.5</text>
+<line x1="235.0" y1="82" x2="235.0" y2="528" class="grid"/>
+<text x="235.0" y="552" text-anchor="middle" class="tick">17.2</text>
+<line x1="380.0" y1="82" x2="380.0" y2="528" class="grid"/>
+<text x="380.0" y="552" text-anchor="middle" class="tick">18.9</text>
+<line x1="525.0" y1="82" x2="525.0" y2="528" class="grid"/>
+<text x="525.0" y="552" text-anchor="middle" class="tick">20.5</text>
+<line x1="670.0" y1="82" x2="670.0" y2="528" class="grid"/>
+<text x="670.0" y="552" text-anchor="middle" class="tick">22.2</text>
+<line x1="90" y1="528.0" x2="670" y2="528.0" class="grid"/>
+<text x="78" y="532.0" text-anchor="end" class="tick">0.70</text>
+<line x1="90" y1="416.5" x2="670" y2="416.5" class="grid"/>
+<text x="78" y="420.5" text-anchor="end" class="tick">0.76</text>
+<line x1="90" y1="305.0" x2="670" y2="305.0" class="grid"/>
+<text x="78" y="309.0" text-anchor="end" class="tick">0.82</text>
+<line x1="90" y1="193.5" x2="670" y2="193.5" class="grid"/>
+<text x="78" y="197.5" text-anchor="end" class="tick">0.87</text>
+<line x1="90" y1="82.0" x2="670" y2="82.0" class="grid"/>
+<text x="78" y="86.0" text-anchor="end" class="tick">0.93</text>
+<line x1="90" y1="528" x2="670" y2="528" class="axis"/>
+<line x1="90" y1="82" x2="90" y2="528" class="axis"/>
+<text x="380.0" y="590" text-anchor="middle" class="label">bits per token</text>
+<text x="26" y="305.0" transform="rotate(-90 26 305.0)" text-anchor="middle" class="label">token accuracy</text>
+<circle cx="708" cy="92" r="6" fill="#1f6f68"/>
+<text x="722" y="96" class="small">dabe</text>
+<circle cx="708" cy="114" r="6" fill="#a4512b"/>
+<text x="722" y="118" class="small">baseline</text>
+<circle cx="708" cy="136" r="6" fill="#9b4d9f"/>
+<text x="722" y="140" class="small">variable</text>
+<circle cx="130.0" cy="486.5" r="7" fill="#a4512b" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="139.0" y="476.5" text-anchor="start" class="small">071</text>
+<circle cx="371.0" cy="497.2" r="7" fill="#a4512b" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="380.0" y="487.2" text-anchor="start" class="small">079</text>
+<circle cx="480.5" cy="493.5" r="7" fill="#a4512b" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="489.5" y="483.5" text-anchor="start" class="small">093</text>
+<circle cx="433.3" cy="224.6" r="7" fill="#9b4d9f" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="442.3" y="214.6" text-anchor="start" class="small">088</text>
+<circle cx="330.8" cy="191.6" r="7" fill="#9b4d9f" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="339.8" y="181.6" text-anchor="start" class="small">089</text>
+<circle cx="630.0" cy="197.5" r="7" fill="#9b4d9f" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="639.0" y="187.5" text-anchor="start" class="small">090</text>
+<circle cx="513.2" cy="112.8" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="522.2" y="102.8" text-anchor="start" class="small">087</text>
+<circle cx="486.0" cy="157.1" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="495.0" y="147.1" text-anchor="start" class="small">092-0.025</text>
+</svg>

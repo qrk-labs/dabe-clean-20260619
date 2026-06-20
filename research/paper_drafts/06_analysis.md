@@ -1,67 +1,16 @@
 # Analysis Notes
 
-## Anticipated Question: Would Sliding Or Variable Token Windows Have Worked?
+## Fixed Chunks As The Carrier
 
-Short answer: we tested this directly in EXP-088, EXP-089, and EXP-090. The result is a useful negative finding. Variable token-window geometry improved some local routing diagnostics, but did not beat the simpler EXP-087 gist-residual lookup architecture on the global rate-distortion objective.
+The architectural interpretation belongs in the method: DABE keeps the 64-token slab fixed and adapts the sparse repair mask over that slab. The variable-window experiments remain important evidence, and they are now presented as direct ablations of the carrier geometry. EXP-088, EXP-089, and EXP-090 test quantile-supervised routing, action-value routing, and hard straight-through routing respectively; none beats the fixed-chunk gist-residual lookup anchor.
 
-### Baseline To Beat
-
-EXP-087 used a fixed 64-token chunk with a coarse gist decoder and a residual-routed sparse lexical lookup. The winning setting was:
-
-- `decoder_mode=gist_residual_lookup`
-- `code_bits=1024`
-- `hierarchical_block_tokens=16`
-- `lexical_lookup_k=32`
-- `lexical_lookup_slot_policy=halting`
-- `residual_router_loss_weight=0.2`
-- `lookup_slot_cost_weight=0.02`
-
-This produced the current anchor result:
-
-| Metric | EXP-087 Best |
-|--------|--------------|
-| token accuracy | `0.91547` |
-| mean chunk deviation | `5.41007` |
-| p90 chunk deviation | `9.04678` |
-| observed effective bits/token | `20.37236` |
-| soft lookup K | `12.71961` |
-| threshold-active K | `9.03257` |
-
-The key idea was not to change token geometry. Instead, the model learned where to spend a sparse repair budget after producing a coarse whole-chunk gist.
-
-### Variable-Window Detour
-
-The variable-window line tested whether we could do better by letting the tokenizer choose fine/medium/full windows inside a fixed 64-token slab.
-
-| Experiment | Core Change | token_acc | chunk deviation mean | observed bits/token | Outcome |
-|------------|-------------|-----------|----------------------|---------------------|---------|
-| EXP-088 | quantile-supervised variable windows | `0.85820` | `9.07550` | `19.46092` | lower bitrate, large quality drop |
-| EXP-089 | action-value teacher from measured candidate deviation | `0.87508` | `7.99482` | `18.29175` | better than EXP-088, still far behind EXP-087 |
-| EXP-090 | straight-through hard window routing | `0.87209` | `8.18653` | `21.70567` | completed cleanly but collapsed to all-fine routing |
-| EXP-087 | fixed chunk + residual lookup | `0.91547` | `5.41007` | `20.37236` | best rate-distortion anchor |
-
-### What We Learned
-
-- EXP-088 answered the naive version of the question. Quantile-based window targets were not enough: the router collapsed to fine-window argmax while soft probabilities still claimed a lower expected bitrate.
-- EXP-089 answered the fairer version. We replaced quantile targets with an action-value teacher that measured actual block Hamming deviation for fine/medium/full candidate decodes. This improved EXP-088 substantially, but reconstruction remained far behind EXP-087.
-- EXP-090 answered the discrete-routing objection. We replaced soft window mixing with straight-through hard routing. This reduced local action regret, but the router collapsed to all-fine windows, erased the bitrate advantage, and still did not recover EXP-087 quality.
-- The evidence points away from sliding token-window size as the primary mechanism. The stronger formulation is a fixed stable chunk representation plus a learned, density-adaptive attention/repair budget.
-
-### Reviewer-Facing Answer
-
-If asked "Would a sliding-window tokenizer have worked?", the answer should be:
-
-> We tested adaptive token-window granularity in three variants: quantile-supervised routing, action-value routing based on measured candidate distortion, and hard straight-through routing. These variants either reduced bitrate at substantial reconstruction cost or collapsed to all-fine routing. The best variable-window result reached `0.87508` token accuracy and `7.99482` mean chunk deviation, still well behind the fixed-window gist-residual lookup baseline at `0.91547` token accuracy and `5.41007` mean chunk deviation. This motivated the paper's focus on sliding attention/repair budget rather than sliding token window size.
-
-### Paper Placement
-
-- Section 5 Results: include the table above as an ablation/negative-result summary.
-- Section 6 Analysis: use this as evidence that variable granularity should be applied to repair budget, not to the primary token-window geometry.
-- Limitations/Future Work: mention cost-aware hard routing as a possible future variant, but do not present it as the main path.
+Reviewer-facing conclusion: adaptive granularity is useful, but in this evidence stack it belongs in repair allocation, not in the primary token-window geometry.
 
 ## Cost-Aware Lookup Knee
 
 EXP-091 and EXP-092 tested whether bluntly increasing sparse lookup cost can reduce bitrate without destroying reconstruction. The result is a clear local knee rather than a monotonic improvement.
+
+![Fig. 3. Cost-knee curve](figures/fig03_cost_knee_curve.png)
 
 ### Replicated Knee
 
@@ -94,9 +43,25 @@ This suggests that the next architectural improvement should not simply increase
 
 EXP-093 provides the matched fixed-rate learned tokenizer baseline that the results table needed. It uses the same TinyStories setup and a no-lookup `hierarchical_local` decoder with `1280` code bits per 64-token chunk (`20.0` bits/token).
 
+![Fig. 1. Matched 20bpt comparator](figures/fig01_matched_20bpt_comparator.png)
+
 | Setting | bits/token | token_acc | chunk deviation mean | chunk deviation p90 |
 |---------|-----------:|----------:|---------------------:|--------------------:|
 | EXP-093 fixed-rate no-lookup | `20.0` | `0.72045` | `17.89119` | `24.14597` |
 | EXP-092 cost-aware sparse repair | `20.06207` observed | `0.89274` | `6.86454` | `10.96876` |
 
 This is the cleanest support for the central mechanism claim. The fixed-rate code is healthy rather than collapsed (`bit_density=0.48766`), but increasing no-lookup capacity to the same bitrate scale does not approach the adaptive repair model. The gain therefore comes from *where* the model spends lexical precision, not only from *how many* bits it spends.
+
+## Active Repair Budget
+
+![Fig. 6. Active repair budget vs distortion](figures/fig06_active_k_vs_quality.png)
+
+The active-K plot shows why budget alone is not enough. More active slots often help, but the best points are not simply the largest-K points. The gist-residual models reduce distortion by spending fewer slots more selectively, which is the core mechanism behind the paper's "adaptive repair budget" framing.
+
+## Runtime Cost
+
+The sparse-repair path has a measurable training cost. EXP-093's fixed-rate no-lookup run logged `14.34` steps/s on T4, while EXP-092's cost-aware sparse-repair sweep logged `7.80` steps/s on the first child. With batch size `32` and chunk size `64`, that corresponds to about `29.4k` tokens/s versus `16.0k` tokens/s. EXP-094's decode diagnostic processed `13.46k` tokens/s with CUDA peak allocated/reserved memory of `2031.74`/`2152.00` MiB.
+
+## Code-Like Text Diagnostics
+
+Python code is a useful stress test because its hard tokens differ from TinyStories: identifiers, indentation, delimiters, operators, and literals carry exact meaning. The diagnostic data path now supports a deterministic Python-code corpus, so a future checkpoint probe can test whether repair slots move from narrative names/content words toward syntax-critical tokens. This should be treated as a diagnostic extension until we run it on the final checkpoint.

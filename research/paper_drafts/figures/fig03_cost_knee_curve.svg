@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="620" viewBox="0 0 920 620">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<style>
+  .title { font-family: Georgia, serif; font-size: 22px; font-weight: 700; fill: #1e2724; }
+  .subtitle { font-family: Georgia, serif; font-size: 13px; fill: #65736f; }
+  .axis { stroke: #1e2724; stroke-width: 1.2; }
+  .grid { stroke: #d8ddd7; stroke-width: 1; }
+  .tick { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #65736f; }
+  .label { font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #1e2724; }
+  .small { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #65736f; }
+</style>
+<text x="70" y="40" class="title">Fig. 3. Replicated cost-knee curve</text>
+<text x="70" y="62" class="subtitle">Slot cost 0.025 is the local quality knee; higher pressure saves bits but over-prunes.</text>
+<text x="86" y="98" class="label">Mean chunk deviation</text>
+<line x1="86.0" y1="122" x2="86.0" y2="482" class="grid"/>
+<text x="86.0" y="505" text-anchor="middle" class="tick">0.0219</text>
+<line x1="161.0" y1="122" x2="161.0" y2="482" class="grid"/>
+<text x="161.0" y="505" text-anchor="middle" class="tick">0.02345</text>
+<line x1="236.0" y1="122" x2="236.0" y2="482" class="grid"/>
+<text x="236.0" y="505" text-anchor="middle" class="tick">0.025</text>
+<line x1="311.0" y1="122" x2="311.0" y2="482" class="grid"/>
+<text x="311.0" y="505" text-anchor="middle" class="tick">0.02655</text>
+<line x1="386.0" y1="122" x2="386.0" y2="482" class="grid"/>
+<text x="386.0" y="505" text-anchor="middle" class="tick">0.0281</text>
+<line x1="86" y1="482.0" x2="386" y2="482.0" class="grid"/>
+<text x="78" y="486.0" text-anchor="end" class="tick">6.84</text>
+<line x1="86" y1="392.0" x2="386" y2="392.0" class="grid"/>
+<text x="78" y="396.0" text-anchor="end" class="tick">6.90</text>
+<line x1="86" y1="302.0" x2="386" y2="302.0" class="grid"/>
+<text x="78" y="306.0" text-anchor="end" class="tick">6.95</text>
+<line x1="86" y1="212.0" x2="386" y2="212.0" class="grid"/>
+<text x="78" y="216.0" text-anchor="end" class="tick">7.01</text>
+<line x1="86" y1="122.0" x2="386" y2="122.0" class="grid"/>
+<text x="78" y="126.0" text-anchor="end" class="tick">7.06</text>
+<line x1="86" y1="482" x2="386" y2="482" class="axis"/>
+<line x1="86" y1="122" x2="86" y2="482" class="axis"/>
+<polyline points="115.0,426.2 236.0,447.2 357.0,156.8" fill="none" stroke="#205493" stroke-width="2.5"/>
+<circle cx="115.0" cy="426.2" r="6" fill="#205493" stroke="#fff" stroke-width="1.5"/>
+<text x="123.0" y="416.2" text-anchor="start" class="small">0.0225</text>
+<circle cx="236.0" cy="447.2" r="6" fill="#205493" stroke="#fff" stroke-width="1.5"/>
+<text x="236.0" y="465.2" text-anchor="middle" class="small">0.025 knee</text>
+<circle cx="357.0" cy="156.8" r="6" fill="#205493" stroke="#fff" stroke-width="1.5"/>
+<text x="349.0" y="146.8" text-anchor="end" class="small">0.0275</text>
+<text x="236.0" y="580" text-anchor="middle" class="label">lookup slot cost weight</text>
+<text x="476" y="98" class="label">Observed bits/token</text>
+<line x1="476.0" y1="122" x2="476.0" y2="482" class="grid"/>
+<text x="476.0" y="505" text-anchor="middle" class="tick">0.0219</text>
+<line x1="551.0" y1="122" x2="551.0" y2="482" class="grid"/>
+<text x="551.0" y="505" text-anchor="middle" class="tick">0.02345</text>
+<line x1="626.0" y1="122" x2="626.0" y2="482" class="grid"/>
+<text x="626.0" y="505" text-anchor="middle" class="tick">0.025</text>
+<line x1="701.0" y1="122" x2="701.0" y2="482" class="grid"/>
+<text x="701.0" y="505" text-anchor="middle" class="tick">0.02655</text>
+<line x1="776.0" y1="122" x2="776.0" y2="482" class="grid"/>
+<text x="776.0" y="505" text-anchor="middle" class="tick">0.0281</text>
+<line x1="476" y1="482.0" x2="776" y2="482.0" class="grid"/>
+<text x="468" y="486.0" text-anchor="end" class="tick">19.80</text>
+<line x1="476" y1="392.0" x2="776" y2="392.0" class="grid"/>
+<text x="468" y="396.0" text-anchor="end" class="tick">19.93</text>
+<line x1="476" y1="302.0" x2="776" y2="302.0" class="grid"/>
+<text x="468" y="306.0" text-anchor="end" class="tick">20.06</text>
+<line x1="476" y1="212.0" x2="776" y2="212.0" class="grid"/>
+<text x="468" y="216.0" text-anchor="end" class="tick">20.19</text>
+<line x1="476" y1="122.0" x2="776" y2="122.0" class="grid"/>
+<text x="468" y="126.0" text-anchor="end" class="tick">20.32</text>
+<line x1="476" y1="482" x2="776" y2="482" class="axis"/>
+<line x1="476" y1="122" x2="476" y2="482" class="axis"/>
+<polyline points="505.0,156.8 626.0,298.5 747.0,447.2" fill="none" stroke="#a23b3b" stroke-width="2.5"/>
+<circle cx="505.0" cy="156.8" r="6" fill="#a23b3b" stroke="#fff" stroke-width="1.5"/>
+<text x="513.0" y="146.8" text-anchor="start" class="small">0.0225</text>
+<circle cx="626.0" cy="298.5" r="6" fill="#a23b3b" stroke="#fff" stroke-width="1.5"/>
+<text x="626.0" y="316.5" text-anchor="middle" class="small">0.025 knee</text>
+<circle cx="747.0" cy="447.2" r="6" fill="#a23b3b" stroke="#fff" stroke-width="1.5"/>
+<text x="739.0" y="437.2" text-anchor="end" class="small">0.0275</text>
+<text x="626.0" y="580" text-anchor="middle" class="label">lookup slot cost weight</text>
+</svg>

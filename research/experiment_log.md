@@ -1,5 +1,73 @@
 # Experiment Log
 
+## EXP-094: Repair Trace Diagnostics on Quality Anchor
+
+**Date:** 2026-06-19
+**Hypothesis:** Running the enhanced decode diagnostic on EXP-087's quality-anchor checkpoint will produce paper-usable examples where the gist stream misses local lexical details and sparse repair corrects them. These examples should make the repair mechanism inspectable without relying on older EXP-078 diagnostics.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides matching EXP-087 lead child (`source_run_id=exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, TinyStories `4096/512`, T4 diagnostic probe), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: `f91cf48daf49e92dcc9b3b8a4b665f84b91070f3` + working-tree diagnostic trace instrumentation)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates EXP-087's saved best checkpoint directly with no additional training.
+- Run is a short diagnostic burst intended to finish within about 10 minutes.
+- Save aggregate decode metrics, diagnostic tokens/s, CUDA peak memory, and top corrected chunks.
+- `corrected_samples` includes target text, gist prediction, final repaired text, lookup positions, keep probabilities, and per-token repair outcomes.
+- Pull lightweight JSON artifacts and update the sparse-repair trace figure if examples are cleaner than EXP-078.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp094_modal_dabe_repair_trace_diag_001` |
+| Source run | `exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Probe budget | full validation cap (`max_batches=43`) with `num_samples=64` corrected examples |
+
+### Decisions
+- [x] Use EXP-087 rather than EXP-078 because EXP-087 is the paper quality anchor.
+- [x] Keep this as a diagnostic/probe run, not additional training.
+- [x] Launch detached Modal probe and capture app ID.
+- [x] Pull lightweight artifacts and summarize corrected examples.
+- [x] Update sparse-repair trace figure from EXP-094.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| First app | `ap-QFydPdF0hTfYh4XDvboIHa` failed during strict checkpoint load |
+| Successful app | `ap-4oa8OgANjvDRfj5ap9I7NL` |
+| Launch contracts | `experiments/modal_launches/20260619_235900_exp094_modal_dabe_repair_trace_diag_001_attempt1_failed.json`, `experiments/modal_launches/20260619_235940_exp094_modal_dabe_repair_trace_diag_001.json` |
+| Run state | completed cleanly after diagnostic loader switched to `strict=False` |
+
+### Results
+| Metric | Value | Interpretation |
+|--------|------:|----------------|
+| batches / val chunks | `43` / `1351` | full validation diagnostic |
+| token_acc | `0.91549` | matches EXP-087 quality-anchor callback |
+| gist_token_acc | `0.67262` | gist alone is much weaker than repaired decode |
+| chunk deviation mean / p90 | `5.40859` / `9.0` | confirms EXP-087 distortion profile |
+| observed effective bits/token | `20.44020` | diagnostic recomputation with current budget accounting |
+| lookup budget K / active K | `12.91695` / `9.37232` | sparse repair remains selective |
+| repair correction fraction | `0.76296` | most gist errors corrected by final decode |
+| repair damage fraction | `0.00690` | repair rarely harms gist-correct tokens |
+| diagnostic throughput | `210.33` chunks/s, `13461.43` tokens/s | measured decode pass on T4 |
+| CUDA peak allocated / reserved | `2031.74` / `2152.00` MiB | measured diagnostic memory |
+
+### Key Observations
+- The best paper-facing corrected example has gist token accuracy `0.625`, final token accuracy `0.984375`, `23` corrected positions, and only one remaining token error.
+- Concrete repairs include `really -> like`, `never -> just`, `hole -> sun`, `new -> sky`, `bad -> monster`, `dragon -> cloud`, and `And -> Anna`.
+- The figure pipeline now uses this EXP-094 trace instead of the older EXP-078 diagnostic, which makes the internal decision-making substantially clearer.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/` |
+| Diagnostics JSON | `experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/decode_diagnostics.json` |
+| Repair figure data | `research/paper_drafts/figures/repair_trace_data.json` |
+
+### Status: [COMPLETE]
+
 ## EXP-093: Fixed-Rate 20bpt No-Lookup Baseline
 
 **Date:** 2026-06-19

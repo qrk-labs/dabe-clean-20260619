@@ -38,3 +38,11 @@ experiments/**/logs/
 experiments/**/checkpoints/
 experiments/**/artifacts/
 experiments/**/wandb/
+
+# Workspace-local binary tool installs
+research/.tools/
+tmp/
+
+# EXP-094 duplicates full diagnostics in these wrapper payloads; keep decode_diagnostics.json instead.
+experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/pipeline_summary.json
+experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/stage_result.json

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -78,6 +79,54 @@ def chunk_deviation_stats(matches: torch.Tensor) -> dict[str, torch.Tensor]:
         "p95": torch.quantile(deviation, 0.95),
         "max": deviation.max(),
     }
+
+
+def _python_code_codec_texts(max_samples: int) -> list[str]:
+    """Deterministic Python-like snippets for repair-trace domain diagnostics."""
+    snippets = [
+        'def normalize_counts(items):\n    totals = {}\n    for name, value in items:\n        key = name.strip().lower()\n        totals[key] = totals.get(key, 0) + int(value)\n    return {k: v / max(1, sum(totals.values())) for k, v in totals.items()}\n',
+        'class RollingMean:\n    def __init__(self, window=8):\n        self.window = window\n        self.values = []\n\n    def update(self, x):\n        self.values.append(float(x))\n        self.values = self.values[-self.window:]\n        return sum(self.values) / len(self.values)\n',
+        "def parse_record(line):\n    user_id, score, flag = line.rstrip().split(',')\n    if flag == 'skip':\n        return None\n    return {'user_id': user_id, 'score': float(score), 'active': flag == 'active'}\n",
+        "async def fetch_json(session, url):\n    async with session.get(url, timeout=10) as response:\n        response.raise_for_status()\n        payload = await response.json()\n    return payload.get('items', [])\n",
+    ]
+    repeated = []
+    for idx in range(max(1, int(max_samples))):
+        snippet = snippets[idx % len(snippets)]
+        repeated.append((snippet + "\n") * 4)
+    return repeated
+
+
+def _resolve_tokenizer_texts(dataset_cfg: dict[str, Any], experiment_cfg: dict[str, Any]) -> tuple[list[str], list[str]]:
+    dataset_name = str(dataset_cfg.get("dataset_name", "roneneldan/TinyStories"))
+    if dataset_name in {"synthetic", "__synthetic__"}:
+        return (
+            _synthetic_codec_texts(int(dataset_cfg.get("train_samples", 256))),
+            _synthetic_codec_texts(int(dataset_cfg.get("val_samples", 64))),
+        )
+    if dataset_name in {"python_code", "__python_code__", "code", "__code__"}:
+        return (
+            _python_code_codec_texts(int(dataset_cfg.get("train_samples", 256))),
+            _python_code_codec_texts(int(dataset_cfg.get("val_samples", 64))),
+        )
+    train_texts = _load_text_dataset_samples(
+        dataset_name=dataset_name,
+        split=str(dataset_cfg.get("train_split", "train")),
+        text_field=str(dataset_cfg.get("text_field", "text")),
+        max_samples=int(dataset_cfg.get("train_samples", 256)),
+        seed=int(experiment_cfg.get("seed", 42)),
+        allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
+        streaming=bool(dataset_cfg.get("streaming", True)),
+    )
+    val_texts = _load_text_dataset_samples(
+        dataset_name=dataset_name,
+        split=str(dataset_cfg.get("val_split", "validation")),
+        text_field=str(dataset_cfg.get("text_field", "text")),
+        max_samples=int(dataset_cfg.get("val_samples", 64)),
+        seed=int(experiment_cfg.get("seed", 42)) + 1,
+        allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
+        streaming=bool(dataset_cfg.get("streaming", True)),
+    )
+    return train_texts, val_texts
 
 
 def build_token_chunk_array(
@@ -1902,29 +1951,7 @@ def _build_tokenizer_data_module(
     model_cfg = dict(tokenizer_cfg.get("model", {}))
     training_cfg = dict(tokenizer_cfg.get("training", {}))
 
-    dataset_name = str(dataset_cfg.get("dataset_name", "roneneldan/TinyStories"))
-    if dataset_name in {"synthetic", "__synthetic__"}:
-        train_texts = _synthetic_codec_texts(int(dataset_cfg.get("train_samples", 256)))
-        val_texts = _synthetic_codec_texts(int(dataset_cfg.get("val_samples", 64)))
-    else:
-        train_texts = _load_text_dataset_samples(
-            dataset_name=dataset_name,
-            split=str(dataset_cfg.get("train_split", "train")),
-            text_field=str(dataset_cfg.get("text_field", "text")),
-            max_samples=int(dataset_cfg.get("train_samples", 256)),
-            seed=int(experiment_cfg.get("seed", 42)),
-            allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
-            streaming=bool(dataset_cfg.get("streaming", True)),
-        )
-        val_texts = _load_text_dataset_samples(
-            dataset_name=dataset_name,
-            split=str(dataset_cfg.get("val_split", "validation")),
-            text_field=str(dataset_cfg.get("text_field", "text")),
-            max_samples=int(dataset_cfg.get("val_samples", 64)),
-            seed=int(experiment_cfg.get("seed", 42)) + 1,
-            allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
-            streaming=bool(dataset_cfg.get("streaming", True)),
-        )
+    train_texts, val_texts = _resolve_tokenizer_texts(dataset_cfg, experiment_cfg)
 
     data_module = DABETokenizerDataModule(
         train_texts=train_texts,
@@ -2048,7 +2075,7 @@ def run_dabe_tokenizer_reverse_diffusion_probe(
         accelerator=accelerator,
     )
     device = torch.device("cuda" if accelerator == "gpu" and torch.cuda.is_available() else "cpu")
-    module = DABETokenizerAutoencoderModule.load_from_checkpoint(str(checkpoint_path), map_location=device)
+    module = DABETokenizerAutoencoderModule.load_from_checkpoint(str(checkpoint_path), map_location=device, strict=False)
     module.to(device)
     model = module.model
     if model.decoder_mode != "diffusion":
@@ -2080,6 +2107,124 @@ def run_dabe_tokenizer_reverse_diffusion_probe(
     return result
 
 
+def _build_repair_sample(
+    *,
+    tokenizer: Any,
+    batch_idx: int,
+    row_idx: int,
+    sample_index: int,
+    input_cpu: torch.Tensor,
+    pred_cpu: torch.Tensor,
+    matches_cpu: torch.Tensor,
+    chunk_deviation_cpu: torch.Tensor,
+    output: DABETokenizerAutoencoderOutput,
+    gist_pred_ids: torch.Tensor | None,
+    gist_matches: torch.Tensor | None,
+    decode_token: Any,
+    raw_token: Any,
+) -> dict[str, Any]:
+    """Build a per-position repair trace for Section 5 interpretability diagnostics."""
+    gist_cpu = gist_pred_ids.detach().cpu() if gist_pred_ids is not None else None
+    gist_matches_cpu = gist_matches.detach().cpu() if gist_matches is not None else None
+    lookup_positions_cpu = output.lookup_positions.detach().cpu() if output.lookup_positions is not None else None
+    lookup_active_cpu = output.lookup_active_mask.detach().cpu() if output.lookup_active_mask is not None else None
+    lookup_keep_cpu = output.lookup_keep_probs.detach().cpu() if output.lookup_keep_probs is not None else None
+
+    target_tokens = [int(x) for x in input_cpu[row_idx].tolist()]
+    pred_tokens = [int(x) for x in pred_cpu[row_idx].tolist()]
+    gist_tokens = [int(x) for x in gist_cpu[row_idx].tolist()] if gist_cpu is not None else []
+    lookup_positions = (
+        [int(x) for x in lookup_positions_cpu[row_idx].tolist()] if lookup_positions_cpu is not None else []
+    )
+    lookup_active = (
+        [bool(x) for x in lookup_active_cpu[row_idx].tolist()]
+        if lookup_active_cpu is not None
+        else ([True] * len(lookup_positions))
+    )
+    lookup_keep_probs = (
+        [float(x) for x in lookup_keep_cpu[row_idx].tolist()] if lookup_keep_cpu is not None else []
+    )
+    lookup_slot_by_position = {pos: slot_idx for slot_idx, pos in enumerate(lookup_positions)}
+    repair_trace = []
+    outcome_counts: dict[str, int] = {}
+    for pos, target_id in enumerate(target_tokens):
+        pred_id = pred_tokens[pos]
+        gist_id = gist_tokens[pos] if gist_tokens else None
+        match = bool(matches_cpu[row_idx, pos].item())
+        gist_match = bool(gist_matches_cpu[row_idx, pos].item()) if gist_matches_cpu is not None else None
+        lookup_slot = lookup_slot_by_position.get(pos)
+        lookup_is_active = bool(lookup_active[lookup_slot]) if lookup_slot is not None and lookup_slot < len(lookup_active) else False
+        keep_prob = (
+            float(lookup_keep_probs[lookup_slot])
+            if lookup_slot is not None and lookup_slot < len(lookup_keep_probs)
+            else None
+        )
+        if gist_id is None or gist_match is None:
+            outcome = "no_gist_trace"
+        elif (not gist_match) and match:
+            outcome = "corrected"
+        elif gist_match and (not match):
+            outcome = "damaged"
+        elif gist_id != pred_id and not match:
+            outcome = "changed_wrong_to_wrong"
+        elif match:
+            outcome = "preserved_correct"
+        else:
+            outcome = "missed"
+        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+        repair_trace.append(
+            {
+                "position": int(pos),
+                "target_id": int(target_id),
+                "target_token": raw_token(target_id),
+                "target_text": decode_token(target_id),
+                "gist_pred_id": int(gist_id) if gist_id is not None else None,
+                "gist_pred_token": raw_token(gist_id) if gist_id is not None else None,
+                "gist_pred_text": decode_token(gist_id) if gist_id is not None else None,
+                "pred_id": int(pred_id),
+                "pred_token": raw_token(pred_id),
+                "pred_text": decode_token(pred_id),
+                "match": match,
+                "gist_match": gist_match,
+                "lookup_candidate": lookup_slot is not None,
+                "lookup_active": lookup_is_active,
+                "lookup_slot_index": int(lookup_slot) if lookup_slot is not None else None,
+                "lookup_keep_prob": keep_prob,
+                "repair_outcome": outcome,
+            }
+        )
+    return {
+        "sample_index": int(sample_index),
+        "batch_index": int(batch_idx),
+        "row_index": int(row_idx),
+        "target_text": tokenizer.decode(target_tokens),
+        "pred_text": tokenizer.decode(pred_tokens),
+        "gist_pred_text": tokenizer.decode(gist_tokens) if gist_tokens else None,
+        "target_token_ids": target_tokens,
+        "pred_token_ids": pred_tokens,
+        "gist_pred_token_ids": gist_tokens,
+        "match_mask": [bool(x) for x in matches_cpu[row_idx].tolist()],
+        "gist_match_mask": [bool(x) for x in gist_matches_cpu[row_idx].tolist()] if gist_matches_cpu is not None else [],
+        "lookup_positions": lookup_positions,
+        "lookup_active_mask": lookup_active,
+        "lookup_budget_k": (
+            float(output.lookup_budget_k.detach().cpu()[row_idx].item()) if output.lookup_budget_k is not None else 0.0
+        ),
+        "lookup_keep_probs": lookup_keep_probs,
+        "repair_trace": repair_trace,
+        "repair_outcome_counts": outcome_counts,
+        "repair_corrected_count": int(outcome_counts.get("corrected", 0)),
+        "repair_changed_count": int(
+            outcome_counts.get("corrected", 0)
+            + outcome_counts.get("damaged", 0)
+            + outcome_counts.get("changed_wrong_to_wrong", 0)
+        ),
+        "token_acc": float(matches_cpu[row_idx].float().mean().item()),
+        "gist_token_acc": float(gist_matches_cpu[row_idx].float().mean().item()) if gist_matches_cpu is not None else None,
+        "chunk_deviation": float(chunk_deviation_cpu[row_idx].item()),
+    }
+
+
 def run_dabe_tokenizer_decode_diagnostics(
     *,
     config: dict[str, Any],
@@ -2100,7 +2245,7 @@ def run_dabe_tokenizer_decode_diagnostics(
         use_fast=bool(codec_cfg.get("force_fast_tokenizer", True)),
     )
     device = torch.device("cuda" if accelerator == "gpu" and torch.cuda.is_available() else "cpu")
-    module = DABETokenizerAutoencoderModule.load_from_checkpoint(str(checkpoint_path), map_location=device)
+    module = DABETokenizerAutoencoderModule.load_from_checkpoint(str(checkpoint_path), map_location=device, strict=False)
     module.to(device)
     model = module.model
     model.eval()
@@ -2114,6 +2259,15 @@ def run_dabe_tokenizer_decode_diagnostics(
     top5_correct = 0.0
     top10_correct = 0.0
     token_total = 0.0
+    gist_token_correct = 0.0
+    gist_token_total = 0.0
+    repair_changed_total = 0.0
+    repair_corrected_total = 0.0
+    repair_damaged_total = 0.0
+    repair_target_total = 0.0
+    lookup_repair_corrected_total = 0.0
+    lookup_repair_changed_total = 0.0
+    lookup_repair_total = 0.0
     chunk_correct = 0.0
     chunk_total = 0.0
     chunk_deviation_sum = 0.0
@@ -2148,6 +2302,21 @@ def run_dabe_tokenizer_decode_diagnostics(
     budget_total = 0.0
     batches_seen = 0
     samples: list[dict[str, Any]] = []
+    corrected_samples: list[dict[str, Any]] = []
+
+    def _decode_token(token_id: int) -> str:
+        return tokenizer.decode([int(token_id)])
+
+    def _raw_token(token_id: int) -> str:
+        convert = getattr(tokenizer, "convert_ids_to_tokens", None)
+        if convert is None:
+            return str(int(token_id))
+        return str(convert(int(token_id)))
+
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.synchronize(device)
+    diagnostic_start = time.perf_counter()
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(data_module.val_dataloader()):
@@ -2164,9 +2333,27 @@ def run_dabe_tokenizer_decode_diagnostics(
             top10_matches = (topk_ids == input_ids.unsqueeze(-1)).any(dim=-1)
             exact = matches.all(dim=-1)
             chunk_deviation = (~matches).float().sum(dim=1)
+            gist_pred_ids = None
+            gist_matches = None
+            repair_changed = None
+            repair_corrected = None
+            repair_damaged = None
+            if output.gist_logits is not None:
+                gist_pred_ids = output.gist_logits.argmax(dim=-1)
+                gist_matches = gist_pred_ids == input_ids
+                repair_changed = gist_pred_ids != pred_ids
+                repair_corrected = (~gist_matches) & matches
+                repair_damaged = gist_matches & (~matches)
+                gist_token_correct += float(gist_matches.sum().detach().cpu().item())
+                gist_token_total += float(input_ids.numel())
+                repair_changed_total += float(repair_changed.sum().detach().cpu().item())
+                repair_corrected_total += float(repair_corrected.sum().detach().cpu().item())
+                repair_damaged_total += float(repair_damaged.sum().detach().cpu().item())
+                repair_target_total += float((~gist_matches).sum().detach().cpu().item())
             block_exact = matches.reshape(input_ids.shape[0], num_blocks, block_size).all(dim=-1)
             half_exact = matches.reshape(input_ids.shape[0], num_halves, half_size).all(dim=-1)
             batch_loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), input_ids.reshape(-1), reduction="sum")
+            lookup_mask = None
             if output.lookup_positions is not None:
                 active_mask = (
                     output.lookup_active_mask
@@ -2176,6 +2363,10 @@ def run_dabe_tokenizer_decode_diagnostics(
                 lookup_mask = torch.zeros_like(input_ids, dtype=torch.bool)
                 lookup_mask.scatter_(dim=1, index=output.lookup_positions, src=active_mask)
                 non_lookup_mask = ~lookup_mask
+                if repair_corrected is not None and repair_changed is not None:
+                    lookup_repair_corrected_total += float((repair_corrected & lookup_mask).sum().detach().cpu().item())
+                    lookup_repair_changed_total += float((repair_changed & lookup_mask).sum().detach().cpu().item())
+                    lookup_repair_total += float(lookup_mask.sum().detach().cpu().item())
                 lookup_token_correct += float(matches[lookup_mask].sum().detach().cpu().item())
                 lookup_token_total += float(lookup_mask.sum().detach().cpu().item())
                 non_lookup_token_correct += float(matches[non_lookup_mask].sum().detach().cpu().item())
@@ -2230,40 +2421,72 @@ def run_dabe_tokenizer_decode_diagnostics(
                 for row_idx in range(input_cpu.shape[0]):
                     if len(samples) >= num_samples:
                         break
-                    target_tokens = [int(x) for x in input_cpu[row_idx].tolist()]
-                    pred_tokens = [int(x) for x in pred_cpu[row_idx].tolist()]
                     samples.append(
-                        {
-                            "sample_index": len(samples),
-                            "target_text": tokenizer.decode(target_tokens),
-                            "pred_text": tokenizer.decode(pred_tokens),
-                            "target_token_ids": target_tokens,
-                            "pred_token_ids": pred_tokens,
-                            "match_mask": [bool(x) for x in matches_cpu[row_idx].tolist()],
-                            "lookup_positions": (
-                                [int(x) for x in output.lookup_positions.detach().cpu()[row_idx].tolist()]
-                                if output.lookup_positions is not None
-                                else []
-                            ),
-                            "lookup_active_mask": (
-                                [bool(x) for x in output.lookup_active_mask.detach().cpu()[row_idx].tolist()]
-                                if output.lookup_active_mask is not None
-                                else []
-                            ),
-                            "lookup_budget_k": (
-                                float(output.lookup_budget_k.detach().cpu()[row_idx].item())
-                                if output.lookup_budget_k is not None
-                                else 0.0
-                            ),
-                            "lookup_keep_probs": (
-                                [float(x) for x in output.lookup_keep_probs.detach().cpu()[row_idx].tolist()]
-                                if output.lookup_keep_probs is not None
-                                else []
-                            ),
-                            "token_acc": float(matches_cpu[row_idx].float().mean().item()),
-                            "chunk_deviation": float(chunk_deviation_cpu[row_idx].item()),
-                        }
+                        _build_repair_sample(
+                            tokenizer=tokenizer,
+                            batch_idx=batch_idx,
+                            row_idx=row_idx,
+                            sample_index=len(samples),
+                            input_cpu=input_cpu,
+                            pred_cpu=pred_cpu,
+                            matches_cpu=matches_cpu,
+                            chunk_deviation_cpu=chunk_deviation_cpu,
+                            output=output,
+                            gist_pred_ids=gist_pred_ids,
+                            gist_matches=gist_matches,
+                            decode_token=_decode_token,
+                            raw_token=_raw_token,
+                        )
                     )
+
+            if gist_pred_ids is not None and gist_matches is not None:
+                input_cpu = input_ids.detach().cpu()
+                pred_cpu = pred_ids.detach().cpu()
+                matches_cpu = matches.detach().cpu()
+                chunk_deviation_cpu = chunk_deviation.detach().cpu()
+                corrected_cpu = repair_corrected.detach().cpu() if repair_corrected is not None else None
+                changed_cpu = repair_changed.detach().cpu() if repair_changed is not None else None
+                for row_idx in range(input_cpu.shape[0]):
+                    corrected_count = int(corrected_cpu[row_idx].sum().item()) if corrected_cpu is not None else 0
+                    changed_count = int(changed_cpu[row_idx].sum().item()) if changed_cpu is not None else 0
+                    if corrected_count <= 0:
+                        continue
+                    sample_payload = _build_repair_sample(
+                        tokenizer=tokenizer,
+                        batch_idx=batch_idx,
+                        row_idx=row_idx,
+                        sample_index=len(corrected_samples),
+                        input_cpu=input_cpu,
+                        pred_cpu=pred_cpu,
+                        matches_cpu=matches_cpu,
+                        chunk_deviation_cpu=chunk_deviation_cpu,
+                        output=output,
+                        gist_pred_ids=gist_pred_ids,
+                        gist_matches=gist_matches,
+                        decode_token=_decode_token,
+                        raw_token=_raw_token,
+                    )
+                    sample_payload["repair_corrected_count"] = corrected_count
+                    sample_payload["repair_changed_count"] = changed_count
+                    corrected_samples.append(sample_payload)
+                    corrected_samples.sort(
+                        key=lambda item: (
+                            int(item.get("repair_corrected_count", 0)),
+                            float(item.get("token_acc", 0.0)),
+                        ),
+                        reverse=True,
+                    )
+                    del corrected_samples[max(1, int(num_samples)) :]
+
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    diagnostic_wall_seconds = time.perf_counter() - diagnostic_start
+    gpu_peak_memory_allocated_mb = (
+        float(torch.cuda.max_memory_allocated(device) / (1024.0 * 1024.0)) if device.type == "cuda" else None
+    )
+    gpu_peak_memory_reserved_mb = (
+        float(torch.cuda.max_memory_reserved(device) / (1024.0 * 1024.0)) if device.type == "cuda" else None
+    )
 
     per_pos_acc = (position_correct / position_total.clamp_min(1.0)).tolist()
     per_pos_top5 = (position_top5 / position_total.clamp_min(1.0)).tolist()
@@ -2308,6 +2531,12 @@ def run_dabe_tokenizer_decode_diagnostics(
         "token_acc": token_correct / max(1.0, token_total),
         "token_top5_acc": top5_correct / max(1.0, token_total),
         "token_top10_acc": top10_correct / max(1.0, token_total),
+        "gist_token_acc": gist_token_correct / max(1.0, gist_token_total) if gist_token_total > 0.0 else None,
+        "repair_changed_fraction": repair_changed_total / max(1.0, token_total),
+        "repair_correction_fraction": repair_corrected_total / max(1.0, repair_target_total),
+        "repair_damage_fraction": repair_damaged_total / max(1.0, gist_token_total),
+        "lookup_repair_correction_fraction": lookup_repair_corrected_total / max(1.0, lookup_repair_total),
+        "lookup_repair_changed_fraction": lookup_repair_changed_total / max(1.0, lookup_repair_total),
         "exact_chunk_acc": chunk_correct / max(1.0, chunk_total),
         "chunk_deviation_mean": chunk_deviation_sum / max(1.0, chunk_total),
         "chunk_deviation_rate_mean": chunk_deviation_sum / max(1.0, token_total),
@@ -2331,7 +2560,13 @@ def run_dabe_tokenizer_decode_diagnostics(
         "per_position_top10_acc": per_pos_top10,
         "worst_positions": ranked_positions[:10],
         "best_positions": list(reversed(ranked_positions[-10:])),
+        "diagnostic_wall_seconds": diagnostic_wall_seconds,
+        "diagnostic_chunks_per_second": chunk_total / max(1.0e-9, diagnostic_wall_seconds),
+        "diagnostic_tokens_per_second": token_total / max(1.0e-9, diagnostic_wall_seconds),
+        "gpu_peak_memory_allocated_mb": gpu_peak_memory_allocated_mb,
+        "gpu_peak_memory_reserved_mb": gpu_peak_memory_reserved_mb,
         "samples": samples,
+        "corrected_samples": corrected_samples,
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "decode_diagnostics.json").write_text(json.dumps(result, indent=2))
@@ -2352,29 +2587,7 @@ def run_dabe_tokenizer_autoencoder(
     model_cfg = dict(tokenizer_cfg.get("model", {}))
     training_cfg = dict(tokenizer_cfg.get("training", {}))
 
-    dataset_name = str(dataset_cfg.get("dataset_name", "roneneldan/TinyStories"))
-    if dataset_name in {"synthetic", "__synthetic__"}:
-        train_texts = _synthetic_codec_texts(int(dataset_cfg.get("train_samples", 256)))
-        val_texts = _synthetic_codec_texts(int(dataset_cfg.get("val_samples", 64)))
-    else:
-        train_texts = _load_text_dataset_samples(
-            dataset_name=dataset_name,
-            split=str(dataset_cfg.get("train_split", "train")),
-            text_field=str(dataset_cfg.get("text_field", "text")),
-            max_samples=int(dataset_cfg.get("train_samples", 256)),
-            seed=int(experiment_cfg.get("seed", 42)),
-            allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
-            streaming=bool(dataset_cfg.get("streaming", True)),
-        )
-        val_texts = _load_text_dataset_samples(
-            dataset_name=dataset_name,
-            split=str(dataset_cfg.get("val_split", "validation")),
-            text_field=str(dataset_cfg.get("text_field", "text")),
-            max_samples=int(dataset_cfg.get("val_samples", 64)),
-            seed=int(experiment_cfg.get("seed", 42)) + 1,
-            allow_synthetic_fallback=bool(dataset_cfg.get("allow_synthetic_fallback", True)),
-            streaming=bool(dataset_cfg.get("streaming", True)),
-        )
+    train_texts, val_texts = _resolve_tokenizer_texts(dataset_cfg, experiment_cfg)
 
     data_module = DABETokenizerDataModule(
         train_texts=train_texts,
