@@ -1,0 +1,203 @@
+{
+  "status": "ok",
+  "run_id": "exp099_modal_python_code_completion_metrics_001",
+  "stage": "tokenizer",
+  "output_dir": "/vol/experiments/exp099_modal_python_code_completion_metrics_001/tokenizer",
+  "config_name": "feasibility_python_code_smoke",
+  "overrides": [
+    "experiment.device=cuda",
+    "optimization.device_profile=cuda_fast",
+    "feasibility.tokenizer_training.device=cuda",
+    "logging.eta_log_every_n_steps=25"
+  ],
+  "config": {
+    "experiment": {
+      "name": "feasibility_python_code_smoke",
+      "seed": 42,
+      "device": "cuda",
+      "train": true,
+      "track": "feasibility",
+      "feasibility_stage": "tokenizer"
+    },
+    "tokenization": {
+      "type": "density_adaptive_bitmask"
+    },
+    "router": {
+      "type": "entropy",
+      "hidden_dim": 128,
+      "num_layers": 1,
+      "density_lower": 0.0,
+      "density_upper": 1.0,
+      "min_bit_width": 10,
+      "max_bit_width": 24,
+      "num_header_bits": 4,
+      "lm_model": "distilbert-base-uncased",
+      "compute_mode": "quality",
+      "stride": 1,
+      "segment_stride": 1
+    },
+    "encoder": {
+      "type": "lfq",
+      "max_bit_width": 24,
+      "num_header_bits": 4,
+      "embed_dim": 224,
+      "num_codes": 24,
+      "vocab_size": 6144,
+      "lower_case": true
+    },
+    "backbone": {
+      "type": "dabe_transformer",
+      "hidden_dim": 384,
+      "num_layers": 4,
+      "num_heads": 6,
+      "ff_dim": 1536,
+      "dropout": 0.1,
+      "max_seq_len": 256,
+      "vocab_size": 6144,
+      "max_bit_width": 28
+    },
+    "training": {
+      "learning_rate": 0.00025,
+      "weight_decay": 0.01,
+      "max_epochs": 1,
+      "batch_size": 8,
+      "grad_clip": 1.0,
+      "warmup_steps": 50,
+      "recon_weight": 1.0,
+      "contrastive_weight": 0.05,
+      "contrastive_temperature": 0.07,
+      "contrastive_margin": 0.5,
+      "early_stop_patience": 2
+    },
+    "data": {
+      "dataset_name": "unimelb-nlp/wikiann",
+      "synthetic_only": false,
+      "source_langs": [
+        "en",
+        "fr"
+      ],
+      "target_langs": [
+        "en",
+        "fr"
+      ],
+      "max_samples": 256,
+      "num_workers": 0
+    },
+    "logging": {
+      "wandb_project": "dabe-feasibility",
+      "wandb_entity": null,
+      "wandb_mode": "offline",
+      "log_every_n_steps": 5,
+      "eta_log_every_n_steps": 25,
+      "enable_progress_bar": false
+    },
+    "evaluation": {
+      "eval_every_n_steps": 100,
+      "save_every_n_epochs": 1,
+      "save_top_k": 0
+    },
+    "optimization": {
+      "profile": {
+        "enabled": false,
+        "steps": 200
+      },
+      "compile": {
+        "enabled": false,
+        "mode": "reduce-overhead"
+      },
+      "attention_backend": "auto",
+      "data_cache": {
+        "mode": "build",
+        "root": null,
+        "preencode_to_disk": false,
+        "tokenizer_batch_size": 64
+      },
+      "device_profile": "cuda_fast",
+      "grad_accumulation_preset": "none",
+      "force_fast_tokenizer": true,
+      "v4_distill": {
+        "compressed_kv_proxy": false,
+        "balance_bias_update": false,
+        "mtp_heads": 0,
+        "mtp_loss_weight": 0.1
+      }
+    },
+    "feasibility": {
+      "bpe_model_name": "gpt2",
+      "baseline_backbone": {
+        "hidden_dim": 320,
+        "num_layers": 6,
+        "num_heads": 5,
+        "ff_dim": 1280,
+        "tie_weights": true
+      },
+      "tokenizer_training": {
+        "dataset_name": "__python_code__",
+        "train_split": "train",
+        "eval_split": "validation",
+        "train_samples": 2048,
+        "eval_samples": 256,
+        "vocab_size": 6144,
+        "epochs": 1,
+        "batch_size": 256,
+        "learning_rate": 0.0008,
+        "device": "cuda",
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": false
+      },
+      "lm_data": {
+        "dataset_name": "__python_code__",
+        "train_split": "train",
+        "val_split": "validation",
+        "train_samples": 2048,
+        "val_samples": 256,
+        "seq_len": 64,
+        "text_field": "text",
+        "allow_synthetic_fallback": false,
+        "streaming": false
+      },
+      "decision_gate": {
+        "loss_tolerance_ratio": 0.2,
+        "min_compression_ratio": 1.0
+      },
+      "tokenizer_artifact_path": "/vol/experiments/exp099_modal_python_code_completion_metrics_001/artifacts/lfq_tokenizer.pt"
+    }
+  },
+  "result": {
+    "track": "feasibility",
+    "stage": "tokenizer",
+    "tokenizer": {
+      "artifact_path": "/vol/experiments/exp099_modal_python_code_completion_metrics_001/artifacts/lfq_tokenizer.pt",
+      "vocab_size": 74,
+      "avg_train_loss": 0.7125762547500286,
+      "compression_ratio_vs_bpe": 3.6632124352331608,
+      "density_distribution": {
+        "width_10": 0.971063898683169,
+        "width_11": 0.017099014175721378,
+        "width_12": 0.0013132330718860186,
+        "width_17": 0.0013132330718860186,
+        "width_24": 0.009210620997337556
+      },
+      "hamming_same": {
+        "mean": 0.6027397260273972,
+        "min": 0.0,
+        "max": 11.0
+      },
+      "hamming_diff": {
+        "mean": 5.6506849315068495,
+        "min": 2.0,
+        "max": 11.0
+      },
+      "runtime": {
+        "prep_seconds": 228.198728363,
+        "first_batch_seconds": null,
+        "steps_per_sec": null,
+        "tokens_per_sec": null,
+        "gpu_mem_peak_mb": null,
+        "cpu_util_avg": 0.0,
+        "compile_graph_breaks": null
+      }
+    }
+  }
+}

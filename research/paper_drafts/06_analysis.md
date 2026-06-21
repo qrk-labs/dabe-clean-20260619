@@ -80,11 +80,11 @@ For the paper-defense probes, token accuracy intervals use Wilson 95% intervals 
 
 ## Python-Code Training Pilot
 
-EXP-098 trains the feasibility DABE LM and a GPT-2 BPE baseline LM on the deterministic Python-code corpus, after first training the DABE tokenizer artifact on the same code text. This is not a broad code benchmark, but it directly addresses whether EXP-097's zero-shot code failure is partly a domain-training issue.
+EXP-098 and EXP-099 train the feasibility DABE LM and a GPT-2 BPE baseline LM on the deterministic Python-code corpus, after first training the DABE tokenizer artifact on the same code text. This is not a broad code benchmark, but it directly addresses whether EXP-097's zero-shot code failure is partly a domain-training issue.
 
-| Setting | validation loss | validation perplexity | train windows | val windows | throughput |
-|---------|----------------:|----------------------:|--------------:|------------:|-----------:|
-| DABE LM | `0.01413` | `1.01423` | `3511` | `439` | `8569.75` tokens/s |
-| GPT-2 BPE baseline LM | `0.05079` | `1.05211` | `21941` | `2741` | `5308.30` tokens/s |
+| Setting | validation loss | validation perplexity | next-token acc | top-5 acc | train windows | val windows |
+|---------|----------------:|----------------------:|---------------:|----------:|--------------:|------------:|
+| DABE LM | `0.02596` | `1.02630` | `0.98964` | `1.0` | `3511` | `439` |
+| GPT-2 BPE baseline LM | `0.05455` | `1.05606` | `0.98012` | `0.99918` | `21941` | `2741` |
 
-The learned DABE tokenizer reports `3.66321x` compression ratio vs GPT-2 BPE on this corpus, with a small learned vocabulary of `74` code-domain span tokens. The result suggests that code-domain exposure can reverse the zero-shot weakness seen in EXP-097, but because the corpus is deterministic and repetitive, it should be cited as a controlled domain-adaptation pilot rather than as general Python-code performance.
+The learned DABE tokenizer reports `3.66321x` compression ratio vs GPT-2 BPE on this corpus, with a small learned vocabulary of `74` code-domain span tokens. EXP-099 confirms that the lower LM loss is reflected in argmax completion accuracy rather than only calibration. EXP-100 then tests reconstruction directly with the same sparse-repair tokenizer-autoencoder family used for the TinyStories anchor: after code-domain training, the deterministic code generator reaches `1.0` token accuracy, `1.0` exact chunk accuracy, and `0.0` mean chunk deviation at `16.20189` observed bits/token. The result suggests that code-domain exposure can reverse the zero-shot weakness seen in EXP-097, but because the corpus is deterministic and repetitive, it should be cited as a controlled domain-adaptation pilot rather than as general Python-code performance.

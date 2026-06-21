@@ -1,5 +1,63 @@
 # Experiment Log
 
+## EXP-100: Python-Code Sparse-Repair Reconstruction Smoke
+
+**Date:** 2026-06-21
+**Hypothesis:** If the poor EXP-097 Python-code reconstruction was primarily domain exposure rather than a hard architectural failure, then training the existing `gist_residual_lookup` tokenizer-autoencoder directly on deterministic Python-code text should substantially improve reconstruction token accuracy and reduce chunk deviation relative to the zero-shot Python-code diagnostic. This is a reconstruction/deviation smoke test, not a new architecture and not a broad code benchmark.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides matching the EXP-087 sparse-repair family but with `dataset_name=__python_code__` (commit: `5af8dc8`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- No new architecture; use `decoder_mode=gist_residual_lookup`, learned selector, halting lookup slots, `code_bits=1024`, and 64-token GPT-2 chunks.
+- Train only on deterministic `__python_code__` text with a Modal T4 cap.
+- Log `val_token_acc_last`, `val_chunk_deviation_mean_last`, `val_chunk_deviation_p90_last`, exact chunk/block metrics, observed bits/token, active K, and ETA.
+- Compare against EXP-097 zero-shot Python-code diagnostic and EXP-094 TinyStories sparse-repair diagnostic.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp100_modal_dabe_python_code_reconstruction_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | function cap `1800s` |
+| Dataset | deterministic `__python_code__` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| App ID | `ap-J6PPuRANc5EAaPwLDzFBAN` |
+| Launch contract | `experiments/modal_launches/20260621_exp100_modal_dabe_python_code_reconstruction_001.json` |
+| State | completed; `pipeline_summary.status=ok` |
+
+### Results
+| Metric | DABE LM | BPE baseline | Interpretation |
+|--------|--------:|-------------:|----------------|
+| validation loss | `0.02596` | `0.05455` | DABE remains lower on the repeated code pilot |
+| validation perplexity | `1.02630` | `1.05606` | DABE remains lower |
+| next-token accuracy | `0.98964` | `0.98012` | DABE is higher by `0.00953` absolute |
+| top-5 accuracy | `1.0` | `0.99918` | both nearly saturated |
+| top-10 accuracy | `1.0` | `1.0` | saturated on this deterministic corpus |
+| train windows | `3511` | `21941` | BPE creates many more token windows from Python punctuation |
+| val windows | `439` | `2741` | tokenization-length effect repeats in validation |
+| tokens/s | `5254.68` | `5183.32` | roughly matched under concurrent run |
+| GPU peak allocated | `931.16` MiB | `931.16` MiB | shared-process peak; not separable per stage |
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/` |
+| Pipeline summary | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/pipeline_summary.json` |
+| DABE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/dabe_lm_stage_result.json` |
+| BPE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/bpe_baseline_stage_result.json` |
+
+### Key Observations
+- EXP-099 confirms that EXP-098's favorable loss was not hiding poor argmax completion: DABE's next-token completion accuracy is also higher than BPE on this deterministic Python-code pilot.
+- The near-saturated top-k metrics show that this generator is easy after in-domain training; cite it as a controlled domain-adaptation check, not a broad Python benchmark.
+- Chunk deviation remains a tokenizer-autoencoder reconstruction metric, so EXP-100 is running separately for the deviation comparison.
+
+### Status: [COMPLETE]
+
 ## EXP-099: Python-Code Completion Metrics and Reconstruction Comparison
 
 **Date:** 2026-06-21
@@ -31,9 +89,42 @@
 |-------|-------|
 | App ID | `ap-n13I0r0uqgeTM8Jiu8phZO` |
 | Launch contract | `experiments/modal_launches/20260621_exp099_modal_python_code_completion_metrics_001.json` |
-| State | running |
+| State | completed; `stage_result.status=ok` |
 
-### Status: [RUNNING]
+### Results
+| Metric | Value | Interpretation |
+|--------|------:|----------------|
+| train / val chunks | `11264` / `1408` | deterministic Python-code chunks generated successfully |
+| validation loss | `0.04465` | converged from first validation loss `14.22545` |
+| token_acc | `1.0` | exact token reconstruction on this deterministic code validation generator |
+| token top-5 / top-10 acc | `1.0` / `1.0` | saturated |
+| exact chunk accuracy | `1.0` | every evaluated 64-token chunk reconstructed exactly |
+| exact block accuracy | `1.0` for all four 16-token blocks | no first-block weakness on this generator |
+| chunk deviation mean / p90 | `0.0` / `0.0` | no residual reconstruction errors |
+| observed effective bits/token | `16.20189` | far below the nominal full lookup ceiling because active repair use is low |
+| lookup active K / keep prob | `1.0` / `0.01835` | the model learns that most positions do not need sparse repair |
+
+### Comparison
+| Experiment | Domain / setup | token_acc | chunk deviation mean | chunk deviation p90 | observed bpt |
+|------------|----------------|----------:|---------------------:|--------------------:|-------------:|
+| EXP-094 | TinyStories sparse-repair diagnostic | `0.91549` | `5.40859` | `9.0` | `20.44020` |
+| EXP-097 | zero-shot Python-code diagnostic from TinyStories checkpoint | `0.41761` | `37.27273` | `44.0` | `21.36938` |
+| EXP-100 | Python-code trained sparse-repair smoke | `1.0` | `0.0` | `0.0` | `16.20189` |
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/` |
+| Pipeline summary | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/pipeline_summary.json` |
+| Stage result | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/stage_result.json` |
+| Metrics CSV | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/metrics.csv` |
+
+### Key Observations
+- EXP-100 shows that the sparse-repair tokenizer-autoencoder can reconstruct the deterministic Python-code generator exactly after in-domain training.
+- The result strongly supports the interpretation that EXP-097 was a domain-exposure failure, not evidence that the reconstruction mechanism cannot represent code-like structure.
+- Because the corpus is repeated and deterministic, this should be framed as a sanity check and paper-defense control rather than a broad Python-code benchmark.
+
+### Status: [COMPLETE]
 
 ## EXP-098: Python-Code BPE vs DABE Concurrent Training
 

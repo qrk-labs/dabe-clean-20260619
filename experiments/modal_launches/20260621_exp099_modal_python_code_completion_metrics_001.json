@@ -2,7 +2,7 @@
   "launched_at": "2026-06-21T23:50:00+01:00",
   "run_id": "exp099_modal_python_code_completion_metrics_001",
   "app_id": "ap-n13I0r0uqgeTM8Jiu8phZO",
-  "status": "running",
+  "status": "completed",
   "function": "scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent",
   "config_name": "feasibility_python_code_smoke",
   "git_commit": "a80ceb3",
@@ -18,5 +18,19 @@
     "val_top10_acc"
   ],
   "periodic_commit_seconds": 120,
-  "modal_url": "https://modal.com/apps/qrk-labs/main/ap-n13I0r0uqgeTM8Jiu8phZO"
+  "modal_url": "https://modal.com/apps/qrk-labs/main/ap-n13I0r0uqgeTM8Jiu8phZO",
+  "result_summary": {
+    "tokenizer_compression_ratio_vs_bpe": 3.6632124352331608,
+    "dabe_val_loss": 0.02595989964902401,
+    "dabe_val_perplexity": 1.026299792666374,
+    "dabe_val_token_acc": 0.9896426796913147,
+    "dabe_val_top5_acc": 1.0,
+    "dabe_val_top10_acc": 1.0,
+    "bpe_val_loss": 0.05454707145690918,
+    "bpe_val_perplexity": 1.0560621856294374,
+    "bpe_val_token_acc": 0.9801167249679565,
+    "bpe_val_top5_acc": 0.9991791248321533,
+    "bpe_val_top10_acc": 1.0,
+    "decision_gate_competitive": true
+  }
 }
