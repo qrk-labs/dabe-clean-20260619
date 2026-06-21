@@ -36,8 +36,50 @@
 | Attempt 2 state | failed after both trainers reached `max_epochs=1`; concurrent Lightning Rich progress-bar teardown raised `IndexError` |
 | Attempt 2 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_002.json` |
 | Attempt 2 decision | disable Lightning progress bars for concurrent same-process training, then relaunch |
+| Attempt 3 app | `ap-cNU0vW9FwELNkH1ap0Bxvu` |
+| Attempt 3 run ID | `exp098_modal_python_code_bpe_dabe_concurrent_003` |
+| Attempt 3 state | completed cleanly |
+| Attempt 3 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_003.json` |
 
-### Status: [RUNNING]
+### Results
+| Metric | DABE LM | BPE baseline | Interpretation |
+|--------|--------:|-------------:|----------------|
+| validation loss | `0.01413` | `0.05079` | DABE lower on this deterministic code pilot |
+| validation perplexity | `1.01423` | `1.05211` | DABE lower |
+| stable | `true` | `true` | both runs numerically stable |
+| train windows | `3511` | `21941` | BPE produces many more token windows from punctuation-heavy code |
+| val windows | `439` | `2741` | same tokenization-length effect |
+| steps/s | `16.74` | `10.37` | DABE stage faster per optimizer step |
+| tokens/s | `8569.75` | `5308.30` | DABE higher throughput under this concurrent T4 run |
+| GPU peak allocated | `683.14` MiB | `683.14` MiB | shared-process peak; not separable per stage |
+
+### Tokenizer Result
+| Metric | Value |
+|--------|------:|
+| learned vocab size | `74` |
+| avg tokenizer train loss | `0.71258` |
+| compression ratio vs GPT-2 BPE | `3.66321` |
+| density width_10 | `0.97106` |
+| hamming same mean | `0.60274` |
+| hamming diff mean | `5.65068` |
+
+### Key Observations
+- Attempt 3 completed within the 40-minute cap after disabling Lightning progress bars for same-process concurrent training.
+- The result supports the narrower claim that EXP-097's poor zero-shot code reconstruction was at least partly a missing code-domain training issue.
+- This is still a deterministic repeated-snippet corpus, so it is a mechanism/domain-adaptation pilot rather than evidence of broad Python-code generalization.
+- BPE has many more LM windows because punctuation-heavy Python expands into more GPT-2 token positions; report both losses and window counts when citing this.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/` |
+| Pipeline summary | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/pipeline_summary.json` |
+| DABE stage result | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/dabe_lm_stage_result.json` |
+| BPE stage result | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/bpe_baseline_stage_result.json` |
+| DABE metrics CSV | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/dabe_lm_metrics.csv` |
+| BPE metrics CSV | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/bpe_baseline_metrics.csv` |
+
+### Status: [COMPLETE]
 
 ## EXP-097: Zero-Shot Python-Code Diagnostics
 

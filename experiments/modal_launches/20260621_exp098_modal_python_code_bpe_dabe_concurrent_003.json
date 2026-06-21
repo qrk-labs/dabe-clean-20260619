@@ -1,0 +1,27 @@
+{
+  "launched_at": "2026-06-21T23:19:00+01:00",
+  "run_id": "exp098_modal_python_code_bpe_dabe_concurrent_003",
+  "app_id": "ap-cNU0vW9FwELNkH1ap0Bxvu",
+  "status": "completed",
+  "function": "scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent",
+  "config_name": "feasibility_python_code_smoke",
+  "git_commit": "e2a99e2",
+  "gpu": "T4",
+  "timeout_seconds": 2400,
+  "execution_mode": "tokenizer_then_concurrent_dabe_lm_and_bpe_baseline",
+  "dataset_name": "__python_code__",
+  "train_samples": 2048,
+  "val_samples": 256,
+  "code_sample_repeat_factor": 8,
+  "enable_progress_bar": false,
+  "periodic_commit_seconds": 120,
+  "modal_url": "https://modal.com/apps/qrk-labs/main/ap-cNU0vW9FwELNkH1ap0Bxvu",
+  "result_summary": {
+    "tokenizer_compression_ratio_vs_bpe": 3.6632124352331608,
+    "dabe_val_loss": 0.0141252176836133,
+    "dabe_val_perplexity": 1.0142254499490706,
+    "bpe_val_loss": 0.0507945753633976,
+    "bpe_val_perplexity": 1.0521067424373773,
+    "decision_gate_competitive": true
+  }
+}
