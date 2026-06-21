@@ -1,0 +1,11 @@
+{
+  "launched_at": "2026-06-21T21:05:27.553120+00:00",
+  "run_id": "exp096_modal_dabe_fixed20_inference_diag_001",
+  "app_id": "ap-P42VAGtWk5L9w9m2Gp11RD",
+  "status": "completed",
+  "function": "scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics",
+  "source_run_id": "exp093_modal_dabe_fixed_rate_20bpt_001",
+  "checkpoint_name": "best-step-0012000.ckpt",
+  "max_batches": 43,
+  "num_samples": 32
+}

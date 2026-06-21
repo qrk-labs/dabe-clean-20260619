@@ -1,0 +1,14 @@
+{
+  "launched_at": "2026-06-21T21:05:27.553235+00:00",
+  "run_id": "exp095_modal_dabe_fixed_rate_20bpt_24k_001",
+  "app_id": "ap-GrR4HQn2oX7B2CobICAEW0",
+  "status": "timed_out_partial_metrics_usable",
+  "function": "scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder",
+  "max_steps": 24000,
+  "timeout_seconds": 1800,
+  "observed_timeout_step": 23500,
+  "last_validation_step": 23244,
+  "best_validation_step": 22185,
+  "remote_best_checkpoint": "/experiments/exp095_modal_dabe_fixed_rate_20bpt_24k_001/checkpoints/best-step-0022000.ckpt",
+  "artifact_note": "Timeout prevented final stage_result.json, but metrics.csv and best checkpoint were written; use as convergence-defense evidence only."
+}

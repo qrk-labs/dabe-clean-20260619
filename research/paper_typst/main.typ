@@ -28,7 +28,7 @@
 
   Across TinyStories tokenizer-autoencoder experiments, we find that the most effective design is not adaptive token-window geometry. Instead, a stable fixed chunk paired with a coarse gist stream and a residual-routed sparse lookup stream gives the best rate-distortion tradeoff. The best quality setting reaches 0.91547 token accuracy and 5.41007 mean chunk deviation at 20.37236 observed #bpt. A replicated cost-aware setting identifies `lookup_slot_cost_weight=0.025` as a local compression knee, reaching 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt.
 
-  Controlled ablations show that sliding or variable token windows either reduce bitrate at substantial reconstruction cost or collapse to all-fine routing. A matched fixed-rate no-lookup baseline at 20.0 #bpt reaches only 0.72045 token accuracy and 17.89119 mean chunk deviation, compared with the cost-aware #dabe point's 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. These results identify stable chunks plus adaptive repair as the stronger learned-tokenizer mechanism at matched bitrate.
+  Controlled ablations show that sliding or variable token windows either reduce bitrate at substantial reconstruction cost or collapse to all-fine routing. A matched fixed-rate no-lookup baseline at 20.0 #bpt reaches 0.72045 token accuracy and 17.89119 mean chunk deviation; a longer convergence-defense run improves this to 0.77324 and 14.51295, but remains far behind the cost-aware #dabe point's 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. These results identify stable chunks plus adaptive repair as the stronger learned-tokenizer mechanism at matched bitrate.
 ]
 
 = Introduction
@@ -41,7 +41,7 @@ We study this question through #dabe, a learned tokenizer-autoencoder that compr
 
 The central design choice in this work is to decouple coarse meaning from lexical repair. A #dabe chunk first receives a compact gist representation intended to capture broad local structure. A second, sparse repair pathway then allocates additional lexical lookup capacity to positions predicted to be difficult. This produces a sliding repair budget over a stable chunk, rather than a sliding token window. The distinction matters: changing the primary token-window geometry can reduce nominal bitrate, but it can also disrupt local code specificity and make reconstruction brittle. In contrast, keeping the chunk stable while adapting the repair budget lets the model preserve a consistent coarse representation and spend precision only where residual error suggests it is useful.
 
-Our experiments on TinyStories establish this framing empirically. The strongest setting, a fixed 64-token chunk with gist encoding and residual-routed sparse lexical lookup, reaches 0.91547 token accuracy and 5.41007 mean chunk deviation at 20.37236 observed #bpt. A cost-aware operating point replicated across adjacent cost settings reaches 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. A matched fixed-rate no-lookup baseline at 20.0 #bpt is stable and non-collapsed, but reaches only 0.72045 token accuracy and 17.89119 mean chunk deviation. The result is a matched-rate separation: the gain is not explained by total bit budget alone, but by the model's ability to place lexical precision where reconstruction requires it.
+Our experiments on TinyStories establish this framing empirically. The strongest setting, a fixed 64-token chunk with gist encoding and residual-routed sparse lexical lookup, reaches 0.91547 token accuracy and 5.41007 mean chunk deviation at 20.37236 observed #bpt. A cost-aware operating point replicated across adjacent cost settings reaches 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. A matched fixed-rate no-lookup baseline at 20.0 #bpt is stable and non-collapsed, reaching 0.72045 token accuracy and 17.89119 mean chunk deviation at the original horizon; a longer convergence-defense run improves to 0.77324 and 14.51295 but still remains far behind sparse repair. The result is a matched-rate separation: the gain is not explained by total bit budget alone, but by the model's ability to place lexical precision where reconstruction requires it.
 
 This paper makes four contributions:
 
@@ -178,7 +178,7 @@ All main tokenizer-autoencoder experiments use TinyStories with 4096 training sa
 
 == Training Protocol
 
-The main runs use a Modal T4 GPU, bf16 mixed precision, batch size 32, 12000 maximum training steps, validation every 300 steps, and checkpointing every 2000 train steps. Each experiment logs its configuration, run ID, launch contract, and final summary into `research/experiment_log.md` and `experiments/modal_downloads/`.
+The main runs use a Modal T4 GPU, bf16 mixed precision, batch size 32, 12000 maximum training steps, validation every 300 steps, and checkpointing every 2000 train steps. #exp[095] extends the fixed-rate comparator toward 24000 steps as a convergence-defense run under the same architecture and data basis. Each experiment logs its configuration, run ID, launch contract, and final summary into `research/experiment_log.md` and `experiments/modal_downloads/`.
 
 == Metrics
 
@@ -200,7 +200,21 @@ The headline runs are small enough for single-T4 execution but not free: sparse 
   caption: [Bitrate and repair-budget accounting for the main settings. Budget $K$ determines the charged side budget; active $K$ is the threshold-active lookup usage.],
 ) <tab-compute>
 
-EXP-094 adds a measured decode-profile pass on the EXP-087 checkpoint: 1351 validation chunks were processed in 6.42 seconds, or 210.33 chunks/s and 13461 tokens/s, with CUDA peak allocated/reserved memory of 2031.74/2152.00 MiB. Computationally, the lookup path adds memory and attention activations proportional to $O(B_"batch" K_"max" d + B_"batch" T K_"max")$ for hidden width $d$, chunk length $T = 64$, and maximum lookup list $K_"max" = 32$.
+== Bitrate Calibration
+
+#figure(
+  table(
+    columns: (2.4fr, 1.2fr, 3.1fr),
+    inset: 5pt,
+    table.header([Quantity], [Value], [Interpretation]),
+    [GPT-2 vocabulary index information cost], [$log_2(50257) approx 15.62$ #bpt], [raw token-ID index reference],
+    [#dabe fixed-rate baseline], [20.00 #bpt], [learned reconstruction from a fixed chunk code],
+    [#dabe sparse repair range], [20.06--20.37 observed #bpt], [base code plus active lookup-slot accounting],
+  ),
+  caption: [Bitrate calibration. These are learned GPT-2-token-ID reconstruction rates, not claims of raw-text compression superiority over BPE.],
+) <tab-bitrate-calibration>
+
+EXP-094 adds a measured decode-profile pass on the EXP-087 checkpoint: 1351 validation chunks were processed in 6.42 seconds, or 210.33 chunks/s and 13461 tokens/s, with CUDA peak allocated/reserved memory of 2031.74/2152.00 MiB. EXP-096 runs the same diagnostic path for the fixed-rate EXP-093 checkpoint: 1351 validation chunks were processed in 2.63 seconds, or 514.54 chunks/s and 32930 tokens/s, with CUDA peak allocated/reserved memory of 852.80/974.00 MiB. The measured inference headline is therefore about 2.45x slower throughput and 2.38x higher peak allocated memory for sparse repair, in exchange for much lower reconstruction distortion. Computationally, the lookup path adds memory and attention activations proportional to $O(B_"batch" K_"max" d + B_"batch" T K_"max")$ for hidden width $d$, chunk length $T = 64$, and maximum lookup list $K_"max" = 32$.
 
 == Baselines and Ablations
 
@@ -223,12 +237,13 @@ The main fixed-rate comparator is #exp[093], a no-lookup hierarchical-local deco
     inset: 5pt,
     table.header([Setting], [#bpt], [Token acc.], [Mean dev.], [p90 dev.]),
     [#exp[093] fixed-rate no lookup], [20.00000], [0.72045], [17.89119], [24.14597],
+    [#exp[095] longer fixed-rate], [20.00000], [0.77324], [14.51295], [20.75514],
     [#exp[092] cost-aware sparse repair], [20.06207], [0.89274], [6.86454], [10.96876],
   ),
   caption: [Matched 20 #bpt result.],
 ) <tab-matched20>
 
-The absolute token-accuracy gain is 0.17229, and mean chunk deviation falls by 11.02665 tokens per 64-token chunk. The fixed-rate baseline is healthy rather than collapsed: its bit density is 0.48766. The gap therefore supports the claim that the gain comes from where lexical precision is spent, not only from how many bits are spent.
+The original matched-horizon token-accuracy gain is 0.17229, and mean chunk deviation falls by 11.02665 tokens per 64-token chunk. #exp[095] shows that longer fixed-rate training improves the comparator to 0.77324 token accuracy and 14.51295 mean deviation, but the sparse-repair point remains 0.11950 absolute token accuracy higher and 7.64841 tokens/chunk lower in mean deviation. The fixed-rate baseline is healthy rather than collapsed: its bit density remains near 0.49. The gap therefore supports the claim that the gain comes from where lexical precision is spent, not only from how many bits are spent or whether the fixed-rate baseline had converged.
 
 == Rate-Distortion Frontier
 
@@ -240,6 +255,10 @@ The absolute token-accuracy gain is 0.17229, and mean chunk deviation falls by 1
 ) <fig-frontier>
 
 The best quality anchor is #exp[087], with 0.91547 token accuracy and 5.41007 mean chunk deviation at 20.37236 observed #bpt. The best lower-cost knee is #exp[092] with slot cost 0.025, which reaches 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt.
+
+== Fixed-Rate Convergence Check
+
+#exp[095] directly tests whether #exp[093] underperformed because the fixed-rate no-lookup baseline was undertrained. The longer run timed out operationally near 23500/24000 steps, but it passed the predeclared 12000-step minimum, wrote metrics through step 23244, and saved a best checkpoint at step 22000. Its best validation point is 0.77324 token accuracy and 14.51295 mean chunk deviation. This improves the fixed-rate baseline materially, but does not approach #exp[092]'s 0.89274 token accuracy and 6.86454 mean deviation.
 
 == Cost-Knee Replication
 
@@ -325,9 +344,11 @@ This ablation narrows the paper's mechanism claim. Adaptive granularity is usefu
 
 #strong[Why sparse repair works.] The gist path turns the chunk code into a smooth whole-span prior. This is useful for predictable text, but exact token reconstruction is brittle around names, punctuation, dialogue markers, and other locally high-information regions. Sparse repair gives the model an explicit way to allocate lexical precision to these holes. @eq-chunk-deviation makes the consequence measurable: the target is not vague semantic similarity, but fewer wrong tokens per chunk.
 
-#strong[Why the fixed-rate comparator matters.] #exp[093] is the rate-matched comparator that isolates the mechanism. It spends the same budget scale inside a learned chunk autoencoder, but without the sparse lexical repair path. Its much higher chunk deviation shows that uniform capacity is a weak substitute for adaptive repair.
+#strong[Why the fixed-rate comparator matters.] #exp[093] is the rate-matched comparator that isolates the mechanism. It spends the same budget scale inside a learned chunk autoencoder, but without the sparse lexical repair path. Its much higher chunk deviation shows that uniform capacity is a weak substitute for adaptive repair. #exp[095] addresses convergence directly: longer training improves fixed-rate reconstruction, but the remaining gap to #exp[092] is still large.
 
-#strong[Code-like text.] We added a deterministic Python-code diagnostic corpus for future checkpoint probes. Code stresses different reconstruction behavior than TinyStories: identifiers, indentation, brackets, operators, string delimiters, and numeric literals are sparse but semantically sharp. The same repair trace machinery can test whether lookup slots move from names and narrative content words toward identifiers and syntax-critical punctuation. We treat this as a diagnostic extension rather than a paper claim until the final checkpoint is evaluated on the code corpus.
+#strong[Inference overhead.] #exp[096] provides the matched no-lookup decode profile for #exp[094]. Fixed-rate decoding reaches 32930 tokens/s and 852.80 MiB peak allocated memory, while sparse repair reaches 13461 tokens/s and 2031.74 MiB. Sparse repair is therefore about 2.45x slower and 2.38x larger in allocated memory on this T4 diagnostic path, traded for a token-accuracy increase from 0.72025 to 0.91549.
+
+#strong[Code-like text.] #exp[097] evaluates the #exp[087] quality-anchor checkpoint zero-shot on a deterministic Python-code corpus. Code stresses different reconstruction behavior than TinyStories: identifiers, indentation, brackets, operators, string delimiters, and numeric literals carry exact meaning. The result is a deliberate scope check rather than a success claim: token accuracy drops to 0.41761 with 37.27273 mean chunk deviation, while active $K$ rises to 16.0. The model recognizes code as difficult and spends repair budget, but the TinyStories-trained lexical repair content is not code-calibrated.
 
 #strong[What remains open.] The cost-aware knee shows a path toward better compression, but it also shows that cost pressure alone diminishes on either side of 0.025. The next architectural question is how to improve lookup correctness and router calibration at a fixed active $K$.
 
@@ -335,7 +356,7 @@ This ablation narrows the paper's mechanism claim. Adaptive granularity is usefu
 
 This study is intentionally framed as tokenizer-autoencoder rate-distortion rather than full downstream language-model pretraining. That choice isolates the tokenization mechanism: the experiments measure how chunk codes, sparse repair, and routing policies affect reconstruction before adding the confounds of language-model scale, optimizer schedules, and downstream task selection. The matched 20 #bpt comparison is therefore the central evidence unit for the paper.
 
-The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; this setting establishes a clean mechanism result that should next be tested on broader corpora, code, multilingual data, and full LM training.
+The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; #exp[097] makes that boundary explicit by reaching only 0.41761 token accuracy on deterministic Python code. The current paper establishes a clean mechanism result that should next be tested on broader corpora, code, multilingual data, and full LM training.
 
 The run plan prioritizes focused, objective comparisons over broad exploratory sweeps. The experiment set includes a matched fixed-rate comparator, a replicated cost-knee neighborhood around #exp[092], a quality anchor in #exp[087], and direct variable-window ablations. Additional seeds and larger-scale runs would support confidence intervals and scaling laws, but they are not required to interpret the main matched-rate separation.
 
@@ -345,7 +366,7 @@ The current models are rate-distortion tokenizers, not lossless compressors. Exa
 
 #dabe studies tokenization as a learned rate-distortion problem over fixed text chunks. The strongest result is not obtained by changing token-window geometry, but by keeping a stable 64-token chunk and adapting a sparse lexical repair budget over it.
 
-The matched comparison between #exp[093] and #exp[092] is the central result: a healthy fixed-rate no-lookup learned tokenizer at 20.0 #bpt reaches 0.72045 token accuracy and 17.89119 mean chunk deviation, while cost-aware #dabe reaches 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. This shows that total bit budget alone does not explain the gain.
+The matched comparison between #exp[093]/#exp[095] and #exp[092] is the central result: a healthy fixed-rate no-lookup learned tokenizer at 20.0 #bpt reaches 0.72045 token accuracy and 17.89119 mean chunk deviation at the original horizon, and improves to 0.77324 and 14.51295 under longer training. Cost-aware #dabe still reaches 0.89274 token accuracy and 6.86454 mean chunk deviation at 20.06207 observed #bpt. This shows that total bit budget and fixed-baseline convergence alone do not explain the gain.
 
 The broader ablation story is consistent. Fixed sparse lookup improves over no-lookup codes; ranked halting recovers much of fixed $K = 32$ quality at lower observed bitrate; the gist-residual architecture improves repair allocation further; and variable token-window geometry fails to beat fixed chunks plus repair. The architectural implication is clear: for learned tokenizers, adapt the repair budget before adapting the token window.
 

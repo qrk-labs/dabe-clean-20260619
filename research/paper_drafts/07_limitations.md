@@ -6,7 +6,7 @@ This study is intentionally framed as tokenizer-autoencoder rate-distortion rath
 
 ## Controlled Dataset Scope
 
-The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; this setting establishes a clean mechanism result that should next be tested on broader corpora, code, multilingual data, and full LM training.
+The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; this setting establishes a clean mechanism result that should next be tested on broader corpora, code, multilingual data, and full LM training. EXP-097 makes this boundary explicit: the EXP-087 TinyStories-trained checkpoint reaches only `0.41761` token accuracy on a deterministic Python-code corpus, so the current evidence should not be read as zero-shot code-tokenizer performance.
 
 ## Focused Run Design
 

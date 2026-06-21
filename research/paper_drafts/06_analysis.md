@@ -50,7 +50,7 @@ EXP-093 provides the matched fixed-rate learned tokenizer baseline that the resu
 | EXP-093 fixed-rate no-lookup | `20.0` | `0.72045` | `17.89119` | `24.14597` |
 | EXP-092 cost-aware sparse repair | `20.06207` observed | `0.89274` | `6.86454` | `10.96876` |
 
-This is the cleanest support for the central mechanism claim. The fixed-rate code is healthy rather than collapsed (`bit_density=0.48766`), but increasing no-lookup capacity to the same bitrate scale does not approach the adaptive repair model. The gain therefore comes from *where* the model spends lexical precision, not only from *how many* bits it spends.
+This is the cleanest support for the central mechanism claim. The fixed-rate code is healthy rather than collapsed (`bit_density=0.48766`), but increasing no-lookup capacity to the same bitrate scale does not approach the adaptive repair model. EXP-095 strengthens this conclusion: extending the same fixed-rate baseline to a best validation step of `22185` raises token accuracy to `0.77324` and lowers mean deviation to `14.51295`, but the cost-aware sparse-repair point remains `0.11950` absolute token accuracy higher and `7.64841` tokens/chunk lower in mean deviation. The gain therefore comes from *where* the model spends lexical precision, not only from *how many* bits it spends or from early fixed-baseline undertraining.
 
 ## Active Repair Budget
 
@@ -60,8 +60,19 @@ The active-K plot shows why budget alone is not enough. More active slots often 
 
 ## Runtime Cost
 
-The sparse-repair path has a measurable training cost. EXP-093's fixed-rate no-lookup run logged `14.34` steps/s on T4, while EXP-092's cost-aware sparse-repair sweep logged `7.80` steps/s on the first child. With batch size `32` and chunk size `64`, that corresponds to about `29.4k` tokens/s versus `16.0k` tokens/s. EXP-094's decode diagnostic processed `13.46k` tokens/s with CUDA peak allocated/reserved memory of `2031.74`/`2152.00` MiB.
+The sparse-repair path has a measurable training cost. EXP-093's fixed-rate no-lookup run logged `14.34` steps/s on T4, while EXP-092's cost-aware sparse-repair sweep logged `7.80` steps/s on the first child. With batch size `32` and chunk size `64`, that corresponds to about `29.4k` tokens/s versus `16.0k` tokens/s. The matched inference diagnostic is sharper: EXP-096 fixed-rate decoding processed `32.93k` tokens/s with `852.80` MiB peak allocated memory, while EXP-094 sparse-repair decoding processed `13.46k` tokens/s with `2031.74` MiB peak allocated memory. The inference headline is therefore `2.45x` slower throughput and `2.38x` higher allocated memory for sparse repair, traded for a large distortion reduction.
 
 ## Code-Like Text Diagnostics
 
-Python code is a useful stress test because its hard tokens differ from TinyStories: identifiers, indentation, delimiters, operators, and literals carry exact meaning. The diagnostic data path now supports a deterministic Python-code corpus, so a future checkpoint probe can test whether repair slots move from narrative names/content words toward syntax-critical tokens. This should be treated as a diagnostic extension until we run it on the final checkpoint.
+Python code is a useful stress test because its hard tokens differ from TinyStories: identifiers, indentation, delimiters, operators, and literals carry exact meaning. EXP-097 evaluates the EXP-087 quality-anchor checkpoint zero-shot on a deterministic Python-code corpus. The result is intentionally modest: `0.41761` token accuracy, `37.27273` mean chunk deviation, and `active K=16.0`. This shows that the TinyStories-trained model does not transfer zero-shot to code reconstruction, while also showing that the router spends more repair budget under code-domain stress. The result is a scope boundary and a future-training target, not a claim of current code-tokenizer quality.
+
+
+## Diagnostic Confidence Intervals
+
+For the paper-defense probes, token accuracy intervals use Wilson 95% intervals over validation token positions. Chunk-deviation intervals use a parametric bootstrap from the observed token-error rate because the current diagnostic artifacts store aggregate chunk deviation but not every per-chunk deviation. These intervals are therefore useful for sanity-checking separation, not a substitute for multi-seed training variance.
+
+| Diagnostic | token_acc 95% CI | chunk deviation mean 95% CI |
+|------------|------------------|-----------------------------|
+| EXP-094 sparse repair | `[0.91362, 0.91733]` | `[5.29016, 5.52630]` |
+| EXP-096 fixed-rate | `[0.71725, 0.72324]` | `[17.71429, 18.09474]` |
+| EXP-097 Python code | `[0.41307, 0.42217]` | `[36.98295, 37.56250]` |

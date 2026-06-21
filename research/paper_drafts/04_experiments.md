@@ -6,7 +6,7 @@ All main tokenizer-autoencoder experiments use TinyStories with `4096` training 
 
 ## Training Protocol
 
-The main runs use a Modal T4 GPU, `bf16-mixed` precision, batch size `32`, `12000` maximum training steps, validation every `300` steps, and checkpointing every `2000` train steps. Each experiment logs its configuration, run ID, launch contract, and final summary into `research/experiment_log.md` and `experiments/modal_downloads/`.
+The main runs use a Modal T4 GPU, `bf16-mixed` precision, batch size `32`, `12000` maximum training steps, validation every `300` steps, and checkpointing every `2000` train steps. EXP-095 extends the fixed-rate comparator toward `24000` steps as a convergence-defense run under the same architecture and data basis. Each experiment logs its configuration, run ID, launch contract, and final summary into `research/experiment_log.md` and `experiments/modal_downloads/`.
 
 ## Metrics
 
@@ -22,7 +22,17 @@ Each main optimizer step processes `32 * 64 = 2048` GPT-2 tokens. The fixed-rate
 | EXP-092 cost-aware sparse repair | `1024` | `22` | `11.82` | `6.64` | `20.062` |
 | EXP-087 quality anchor | `1024` | `22` | `12.72` | `9.03` | `20.372` |
 
-EXP-094 adds a measured decode-profile pass on the EXP-087 checkpoint: `1351` validation chunks in `6.42` seconds, or `210.33` chunks/s and `13,461` tokens/s. CUDA peak allocated/reserved memory was `2031.74`/`2152.00` MiB.
+### Bitrate Calibration
+
+| Quantity | Value | Interpretation |
+|----------|------:|----------------|
+| GPT-2 vocabulary index information cost | `log2(50257) = 15.62` bits/token | raw ID index reference point |
+| DABE fixed-rate baseline | `20.00` bits/token | learned reconstruction from a fixed chunk code |
+| DABE sparse repair operating range | `20.06`-`20.37` observed bits/token | base code plus active lookup-slot accounting |
+
+These rates are learned GPT-2-token-ID reconstruction rates. They should not be read as claims that DABE is a raw-text compressor superior to BPE; the comparison is between learned tokenizer-autoencoder mechanisms under a shared GPT-2-token reconstruction basis.
+
+EXP-094 adds a measured decode-profile pass on the EXP-087 checkpoint: `1351` validation chunks in `6.42` seconds, or `210.33` chunks/s and `13,461` tokens/s. EXP-096 runs the same diagnostic path for the fixed-rate EXP-093 checkpoint: `1351` validation chunks in `2.63` seconds, or `514.54` chunks/s and `32,930` tokens/s. CUDA peak allocated/reserved memory was `2031.74`/`2152.00` MiB for sparse repair and `852.80`/`974.00` MiB for fixed-rate decoding. The measured inference headline is therefore approximately `2.45x` slower throughput and `2.38x` higher peak allocated memory for sparse repair, in exchange for much lower reconstruction distortion.
 
 ## Baselines And Ablations
 
