@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-21
 **Hypothesis:** EXP-098's favorable Python-code LM loss should translate into measurable next-token completion accuracy for both DABE and BPE on the same deterministic code validation corpus. However, LM completion metrics and tokenizer reconstruction metrics answer different questions: completion accuracy tests code-domain language modeling, while chunk deviation requires the tokenizer-autoencoder diagnostic path. If the completion result holds, DABE should remain competitive with or better than BPE on token/top-k completion while preserving the EXP-098 compression signal; reconstruction deviation should be compared separately against TinyStories diagnostics.
-**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` with added LM completion metrics (commit: pending)
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` with added LM completion metrics (commit: `a80ceb3`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
 
@@ -25,6 +25,13 @@
 | Timeout | `2400s` |
 | Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
 | Dataset | deterministic `__python_code__` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| App ID | `ap-n13I0r0uqgeTM8Jiu8phZO` |
+| Launch contract | `experiments/modal_launches/20260621_exp099_modal_python_code_completion_metrics_001.json` |
+| State | running |
 
 ### Status: [RUNNING]
 
