@@ -97,7 +97,9 @@ def _python_code_texts(max_samples: int) -> list[str]:
     samples: list[str] = []
     for idx in range(max(1, int(max_samples))):
         snippet = snippets[idx % len(snippets)]
-        samples.append((snippet + "\n") * 4)
+        # Repeat enough times that both BPE tokens and DABE word-span tokens
+        # produce non-empty 64-step language-model windows.
+        samples.append((snippet + "\n") * 8)
     return samples
 
 

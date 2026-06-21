@@ -1,0 +1,19 @@
+{
+  "launched_at": "2026-06-21T22:58:00+01:00",
+  "run_id": "exp098_modal_python_code_bpe_dabe_concurrent_001",
+  "app_id": "ap-5JZPO2rZgMvtE1vPSbblE4",
+  "status": "failed",
+  "function": "scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent",
+  "config_name": "feasibility_python_code_smoke",
+  "git_commit": "3fe98cb",
+  "gpu": "T4",
+  "timeout_seconds": 2400,
+  "execution_mode": "tokenizer_then_concurrent_dabe_lm_and_bpe_baseline",
+  "dataset_name": "__python_code__",
+  "train_samples": 2048,
+  "val_samples": 256,
+  "periodic_commit_seconds": 120,
+  "modal_url": "https://modal.com/apps/qrk-labs/main/ap-5JZPO2rZgMvtE1vPSbblE4",
+  "failure": "DABE LM had zero 64-span windows; BPE baseline completed before parent failed.",
+  "decision": "Relaunch after increasing deterministic Python-code sample length."
+}

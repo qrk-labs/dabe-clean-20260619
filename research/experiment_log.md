@@ -25,7 +25,14 @@
 | Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
 | Dataset | deterministic `__python_code__` |
 
-### Status: [PLANNED]
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Attempt 1 app | `ap-5JZPO2rZgMvtE1vPSbblE4` |
+| Attempt 1 state | failed after BPE completed; DABE LM had zero 64-span windows |
+| Attempt 1 decision | lengthen deterministic code samples so DABE span-token windows are non-empty, then relaunch |
+
+### Status: [RUNNING]
 
 ## EXP-097: Zero-Shot Python-Code Diagnostics
 
