@@ -39,6 +39,21 @@ def build_causal_mask(seq_len: int, device: torch.device) -> torch.Tensor:
     return mask.unsqueeze(0).unsqueeze(0)
 
 
+def _lm_completion_metrics(logits: torch.Tensor, targets: torch.Tensor) -> dict[str, torch.Tensor]:
+    """Compute next-token completion metrics for feasibility LM comparisons."""
+    flat_logits = logits.reshape(-1, logits.shape[-1])
+    flat_targets = targets.reshape(-1)
+    predictions = flat_logits.argmax(dim=-1)
+    metrics = {
+        "token_acc": (predictions == flat_targets).float().mean(),
+    }
+    for k in (5, 10):
+        usable_k = min(k, flat_logits.shape[-1])
+        topk = torch.topk(flat_logits, k=usable_k, dim=-1).indices
+        metrics[f"top{k}_acc"] = topk.eq(flat_targets.unsqueeze(-1)).any(dim=-1).float().mean()
+    return metrics
+
+
 def _sequence_windows(ids: Sequence[int], seq_len: int) -> list[tuple[list[int], list[int]]]:
     windows: list[tuple[list[int], list[int]]] = []
     if len(ids) <= seq_len:
@@ -1400,6 +1415,15 @@ class DABECausalLMModule(L.LightningModule):
         self.log(f"dabe/{stage}_base_loss", base_loss)
         self.log(f"dabe/{stage}_mtp_loss", mtp_loss)
         self.log(f"dabe/{stage}_stable", torch.tensor(1.0, device=self.device))
+        for metric_name, metric_value in _lm_completion_metrics(logits, targets).items():
+            self.log(
+                f"dabe/{stage}_{metric_name}",
+                metric_value,
+                prog_bar=stage == "val" and metric_name == "token_acc",
+                on_step=False,
+                on_epoch=True,
+                batch_size=targets.numel(),
+            )
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -1470,6 +1494,15 @@ class BPECausalLMModule(L.LightningModule):
         self.log(f"bpe/{stage}_base_loss", base_loss)
         self.log(f"bpe/{stage}_mtp_loss", mtp_loss)
         self.log(f"bpe/{stage}_stable", torch.tensor(1.0, device=self.device))
+        for metric_name, metric_value in _lm_completion_metrics(logits, targets).items():
+            self.log(
+                f"bpe/{stage}_{metric_name}",
+                metric_value,
+                prog_bar=stage == "val" and metric_name == "token_acc",
+                on_step=False,
+                on_epoch=True,
+                batch_size=targets.numel(),
+            )
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -1791,10 +1824,24 @@ def run_feasibility_experiment(
                 raise
         metric = dabe_trainer.callback_metrics.get("dabe/val_loss")
         dabe_val_loss = float(metric.item()) if metric is not None else None
+        dabe_val_token_acc_metric = dabe_trainer.callback_metrics.get("dabe/val_token_acc")
+        dabe_val_top5_metric = dabe_trainer.callback_metrics.get("dabe/val_top5_acc")
+        dabe_val_top10_metric = dabe_trainer.callback_metrics.get("dabe/val_top10_acc")
         dabe_stable = dabe_model.nan_batches == 0
         result["dabe_lm"] = {
             "val_loss": dabe_val_loss,
             "val_perplexity": math.exp(dabe_val_loss) if dabe_val_loss is not None else None,
+            "val_token_acc": (
+                float(dabe_val_token_acc_metric.item())
+                if dabe_val_token_acc_metric is not None
+                else None
+            ),
+            "val_top5_acc": (
+                float(dabe_val_top5_metric.item()) if dabe_val_top5_metric is not None else None
+            ),
+            "val_top10_acc": (
+                float(dabe_val_top10_metric.item()) if dabe_val_top10_metric is not None else None
+            ),
             "stable": dabe_stable,
             "train_samples": len(dabe_data.train_dataset),
             "val_samples": len(dabe_data.val_dataset),
@@ -1915,10 +1962,24 @@ def run_feasibility_experiment(
                 raise
         metric = bpe_trainer.callback_metrics.get("bpe/val_loss")
         bpe_val_loss = float(metric.item()) if metric is not None else None
+        bpe_val_token_acc_metric = bpe_trainer.callback_metrics.get("bpe/val_token_acc")
+        bpe_val_top5_metric = bpe_trainer.callback_metrics.get("bpe/val_top5_acc")
+        bpe_val_top10_metric = bpe_trainer.callback_metrics.get("bpe/val_top10_acc")
         bpe_stable = bpe_model.nan_batches == 0
         result["bpe_baseline"] = {
             "val_loss": bpe_val_loss,
             "val_perplexity": math.exp(bpe_val_loss) if bpe_val_loss is not None else None,
+            "val_token_acc": (
+                float(bpe_val_token_acc_metric.item())
+                if bpe_val_token_acc_metric is not None
+                else None
+            ),
+            "val_top5_acc": (
+                float(bpe_val_top5_metric.item()) if bpe_val_top5_metric is not None else None
+            ),
+            "val_top10_acc": (
+                float(bpe_val_top10_metric.item()) if bpe_val_top10_metric is not None else None
+            ),
             "stable": bpe_stable,
             "train_samples": len(bpe_data.train_dataset),
             "val_samples": len(bpe_data.val_dataset),

@@ -1,5 +1,33 @@
 # Experiment Log
 
+## EXP-099: Python-Code Completion Metrics and Reconstruction Comparison
+
+**Date:** 2026-06-21
+**Hypothesis:** EXP-098's favorable Python-code LM loss should translate into measurable next-token completion accuracy for both DABE and BPE on the same deterministic code validation corpus. However, LM completion metrics and tokenizer reconstruction metrics answer different questions: completion accuracy tests code-domain language modeling, while chunk deviation requires the tokenizer-autoencoder diagnostic path. If the completion result holds, DABE should remain competitive with or better than BPE on token/top-k completion while preserving the EXP-098 compression signal; reconstruction deviation should be compared separately against TinyStories diagnostics.
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` with added LM completion metrics (commit: pending)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- No new architecture and no downstream LM training beyond the existing EXP-098 feasibility setup.
+- Re-run deterministic `dataset_name=__python_code__` with tokenizer prep, then concurrent DABE LM and BPE LM stages in one Modal T4 container.
+- Enforce the same 40-minute function timeout.
+- Log validation loss, perplexity, `val_token_acc`, `val_top5_acc`, `val_top10_acc`, throughput, memory, and tokenizer compression ratio.
+- Treat chunk deviation as a separate tokenizer-autoencoder diagnostic metric; do not infer deviation from LM loss.
+- Compare the resulting completion metrics against TinyStories reconstruction diagnostics in prose without collapsing the two metric families.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp099_modal_python_code_completion_metrics_001` |
+| Modal function | `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` |
+| GPU | one `T4` |
+| Timeout | `2400s` |
+| Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
+| Dataset | deterministic `__python_code__` |
+
+### Status: [RUNNING]
+
 ## EXP-098: Python-Code BPE vs DABE Concurrent Training
 
 **Date:** 2026-06-21
