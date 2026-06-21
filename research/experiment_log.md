@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-21
 **Hypothesis:** Training both the DABE feasibility LM and the GPT-2 BPE baseline LM on the deterministic Python-code corpus should distinguish whether the out-of-domain weakness in EXP-097 is primarily a missing code-domain training issue rather than a sparse-repair mechanism failure. If DABE benefits from code-domain exposure, its validation loss/perplexity should move closer to the BPE baseline while preserving a favorable compression-ratio signal from the learned tokenizer artifact.
-**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: `4d4f627`)
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: `0878aa3`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
 
@@ -31,6 +31,10 @@
 | Attempt 1 app | `ap-5JZPO2rZgMvtE1vPSbblE4` |
 | Attempt 1 state | failed after BPE completed; DABE LM had zero 64-span windows |
 | Attempt 1 decision | lengthen deterministic code samples so DABE span-token windows are non-empty, then relaunch |
+| Attempt 2 app | `ap-DeQJk6bEQci52rfw5XjSh5` |
+| Attempt 2 run ID | `exp098_modal_python_code_bpe_dabe_concurrent_002` |
+| Attempt 2 state | running; BPE and DABE LM trainers both started in the same Modal app |
+| Attempt 2 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_002.json` |
 
 ### Status: [RUNNING]
 
