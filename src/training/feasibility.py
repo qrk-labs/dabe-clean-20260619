@@ -1613,6 +1613,7 @@ def _build_trainer(
         precision=_resolve_precision(config, accelerator),
         log_every_n_steps=int(logging_cfg.get("log_every_n_steps", 10)),
         default_root_dir=str(output_dir),
+        enable_progress_bar=bool(logging_cfg.get("enable_progress_bar", True)),
     )
 
 

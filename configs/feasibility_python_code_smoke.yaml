@@ -74,5 +74,8 @@ feasibility:
     loss_tolerance_ratio: 0.2
     min_compression_ratio: 1.0
 
+logging:
+  enable_progress_bar: false
+
 evaluation:
   save_top_k: 0

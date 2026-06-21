@@ -33,8 +33,9 @@
 | Attempt 1 decision | lengthen deterministic code samples so DABE span-token windows are non-empty, then relaunch |
 | Attempt 2 app | `ap-DeQJk6bEQci52rfw5XjSh5` |
 | Attempt 2 run ID | `exp098_modal_python_code_bpe_dabe_concurrent_002` |
-| Attempt 2 state | running; BPE and DABE LM trainers both started in the same Modal app |
+| Attempt 2 state | failed after both trainers reached `max_epochs=1`; concurrent Lightning Rich progress-bar teardown raised `IndexError` |
 | Attempt 2 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_002.json` |
+| Attempt 2 decision | disable Lightning progress bars for concurrent same-process training, then relaunch |
 
 ### Status: [RUNNING]
 
