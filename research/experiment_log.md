@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-21
 **Hypothesis:** Training both the DABE feasibility LM and the GPT-2 BPE baseline LM on the deterministic Python-code corpus should distinguish whether the out-of-domain weakness in EXP-097 is primarily a missing code-domain training issue rather than a sparse-repair mechanism failure. If DABE benefits from code-domain exposure, its validation loss/perplexity should move closer to the BPE baseline while preserving a favorable compression-ratio signal from the learned tokenizer artifact.
-**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: pending prelaunch commit)
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: `4d4f627`)
 **WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
 **Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
 
