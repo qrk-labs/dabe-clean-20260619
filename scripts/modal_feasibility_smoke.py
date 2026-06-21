@@ -9,6 +9,7 @@ import shlex
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -215,6 +216,83 @@ def run_pipeline(
         lambda: runner.run_stages(parse_stage_list(stages)),
         interval_seconds=periodic_commit_seconds,
     )
+    return _commit_with_result(payload)
+
+
+@app.function(
+    image=image,
+    gpu="T4",
+    cpu=8,
+    memory=32768,
+    timeout=40 * 60,
+    volumes={"/vol": runs_volume},
+)
+def run_python_code_dabe_bpe_concurrent(
+    config_name: str = "feasibility_python_code_smoke",
+    overrides: str = "",
+    run_id: str = "",
+    periodic_commit_seconds: int = 120,
+) -> dict[str, Any]:
+    """Train DABE and BPE LM baselines concurrently after shared tokenizer prep."""
+    runtime_overrides = _merge_override_string(
+        overrides,
+        [
+            "experiment.device=cuda",
+            "optimization.device_profile=cuda_fast",
+            "feasibility.tokenizer_training.device=cuda",
+            "logging.eta_log_every_n_steps=25",
+        ],
+    )
+    runner = _stage_runner(
+        config_name=config_name,
+        overrides=runtime_overrides,
+        run_id=run_id or None,
+    )
+
+    def _run() -> dict[str, Any]:
+        tokenizer_payload = runner.run_stage("tokenizer")
+        stage_payloads: dict[str, Any] = {"tokenizer": tokenizer_payload}
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+        def _run_stage(stage: str) -> dict[str, Any]:
+            stage_runner = _stage_runner(
+                config_name=config_name,
+                overrides=runtime_overrides,
+                run_id=runner.context.run_id,
+            )
+            return stage_runner.run_stage(stage)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = {
+                pool.submit(_run_stage, stage): stage
+                for stage in ("dabe_lm", "bpe_baseline")
+            }
+            for future in as_completed(futures):
+                stage = futures[future]
+                stage_payloads[stage] = future.result()
+                runs_volume.commit()
+
+        summary = runner._load_summary()
+        summary["status"] = (
+            "ok"
+            if all(payload.get("status") == "ok" for payload in stage_payloads.values())
+            else "partial_or_failed"
+        )
+        summary["execution_mode"] = "tokenizer_then_concurrent_dabe_lm_and_bpe_baseline"
+        summary["concurrent_stages"] = ["dabe_lm", "bpe_baseline"]
+        summary["stage_statuses"] = {
+            stage: payload.get("status") for stage, payload in stage_payloads.items()
+        }
+        runner._write_json(runner.context.summary_path, summary)
+        return summary
+
+    payload = _run_with_periodic_commits(_run, interval_seconds=periodic_commit_seconds)
     return _commit_with_result(payload)
 
 

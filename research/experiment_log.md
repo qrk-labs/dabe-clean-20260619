@@ -1,5 +1,32 @@
 # Experiment Log
 
+## EXP-098: Python-Code BPE vs DABE Concurrent Training
+
+**Date:** 2026-06-21
+**Hypothesis:** Training both the DABE feasibility LM and the GPT-2 BPE baseline LM on the deterministic Python-code corpus should distinguish whether the out-of-domain weakness in EXP-097 is primarily a missing code-domain training issue rather than a sparse-repair mechanism failure. If DABE benefits from code-domain exposure, its validation loss/perplexity should move closer to the BPE baseline while preserving a favorable compression-ratio signal from the learned tokenizer artifact.
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: pending prelaunch commit)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- Run only the existing feasibility DABE LM and BPE baseline mechanisms; no new architecture.
+- Use deterministic `dataset_name=__python_code__` for tokenizer training and LM training/validation.
+- Train the DABE tokenizer artifact first, then run `dabe_lm` and `bpe_baseline` concurrently inside one Modal T4 container.
+- Enforce a 40-minute function timeout.
+- Save per-stage `stage_result.json`, `config.yaml`, final `pipeline_summary.json`, validation loss/perplexity, stability flags, compression ratio vs BPE, runtime throughput, and memory metrics.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp098_modal_python_code_bpe_dabe_concurrent_001` |
+| Modal function | `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` |
+| GPU | one `T4` |
+| Timeout | `2400s` |
+| Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
+| Dataset | deterministic `__python_code__` |
+
+### Status: [PLANNED]
+
 ## EXP-097: Zero-Shot Python-Code Diagnostics
 
 **Date:** 2026-06-21

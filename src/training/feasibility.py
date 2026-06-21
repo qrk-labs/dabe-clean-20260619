@@ -83,6 +83,24 @@ def _extract_text_field(example: dict[str, Any], text_field: str) -> str:
     return ""
 
 
+def _python_code_texts(max_samples: int) -> list[str]:
+    """Deterministic Python-code corpus for paper-defense domain probes."""
+    snippets = [
+        "def add_user(users, name):\n    users.append({'name': name, 'active': True})\n    return users\n",
+        "class Cache:\n    def __init__(self):\n        self.items = {}\n\n    def get(self, key, default=None):\n        return self.items.get(key, default)\n",
+        "for idx, value in enumerate(values):\n    if value % 2 == 0:\n        total += value\n    else:\n        skipped.append(idx)\n",
+        "with open(path, 'r', encoding='utf-8') as handle:\n    lines = [line.strip() for line in handle if line.strip()]\n",
+        "try:\n    result = client.fetch(user_id=user_id, timeout=3.0)\nexcept TimeoutError:\n    result = {'error': 'timeout'}\n",
+        "def normalize_batch(batch):\n    mean = sum(batch) / max(len(batch), 1)\n    return [(item - mean) for item in batch]\n",
+        "async def fetch_json(session, url):\n    async with session.get(url, timeout=10) as response:\n        response.raise_for_status()\n        return await response.json()\n",
+    ]
+    samples: list[str] = []
+    for idx in range(max(1, int(max_samples))):
+        snippet = snippets[idx % len(snippets)]
+        samples.append((snippet + "\n") * 4)
+    return samples
+
+
 def _load_text_dataset_samples(
     dataset_name: str,
     split: str,
@@ -94,6 +112,9 @@ def _load_text_dataset_samples(
     cache_mode: str = "none",
     cache_root: Path | None = None,
 ) -> list[str]:
+    if str(dataset_name) in {"python_code", "__python_code__", "code", "__code__"}:
+        return _python_code_texts(max_samples)
+
     cache_file: Path | None = None
     if cache_root is not None and cache_mode in {"build", "reuse"}:
         key = _hash_key([
