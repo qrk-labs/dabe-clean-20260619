@@ -12,6 +12,11 @@
       "name": "Tsowa, Babangida Usman",
       "affiliation": "Qrk Labs",
       "email": "babangida@qrk.ng"
+    },
+    {
+      "name": "Mustapha, Abdul-malik Abdullahi",
+      "affiliation": "Qrk Labs",
+      "email": "maleek@qrk.ng"
     }
   ],
   "description": "Software and lightweight reproducibility artifacts for the DABE paper, including source code, selected configs, figure generation data, experiment logs, launch contracts, and Modal JSON/CSV summaries. The artifact supports the paper's central claim that fixed 64-token chunks plus adaptive sparse lexical repair outperform fixed-rate learned chunk compression and adaptive token-window geometry in the tested tokenizer-autoencoder setting.",
@@ -28,7 +33,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "10.5281/zenodo.TODO",
+      "identifier": "10.5281/zenodo.20796190",
       "relation": "isSupplementTo",
       "resource_type": "publication-preprint"
     },

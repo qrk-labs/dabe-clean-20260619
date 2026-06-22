@@ -8,8 +8,11 @@ import sys
 from pathlib import Path
 
 
-PLACEHOLDER = "10.5281/zenodo.TODO"
+PLACEHOLDERS = ["10.5281/zenodo.TODO", "10.5281/zenodo.20796190"]
 TARGETS = [
+    "CITATION.cff",
+    ".zenodo.json",
+    "codemeta.json",
     "zenodo/README.md",
     "zenodo/CHECKLIST.md",
     "zenodo/UPLOAD_FIELDS.md",
@@ -42,12 +45,14 @@ def main() -> int:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
-        new_text = text.replace(PLACEHOLDER, doi)
+        new_text = text
+        for placeholder in PLACEHOLDERS:
+            new_text = new_text.replace(placeholder, doi)
         if new_text != text:
             path.write_text(new_text, encoding="utf-8")
             changed += 1
 
-    print(f"Updated {changed} files from {PLACEHOLDER} to {doi}")
+    print(f"Updated {changed} files to {doi}")
     return 0
 
 

@@ -14,11 +14,12 @@
 #align(center)[
   #text(size: 18pt, weight: "bold")[Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair]
 
-  #v(0.6em)
-  #text[Mainasara Al-amin Tsowa ]#text("<mainasara@qrk.ng>")
-
-  #linebreak()
-  #text[Babangida Usman Tsowa ]#text("<babangida@qrk.ng>")
+  #v(0.35em)
+  #text(size: 9.4pt)[Mainasara Al-amin Tsowa ]#text(size: 9.4pt, "<mainasara@qrk.ng>")
+  #v(0.08em)
+  #text(size: 9.4pt)[Babangida Usman Tsowa ]#text(size: 9.4pt, "<babangida@qrk.ng>")
+  #v(0.08em)
+  #text(size: 9.4pt)[Abdul-malik Abdullahi Mustapha ]#text(size: 9.4pt, "<maleek@qrk.ng>")
 ]
 
 #v(1em)

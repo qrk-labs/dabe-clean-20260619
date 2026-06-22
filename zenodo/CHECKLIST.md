@@ -5,15 +5,16 @@
 - [ ] Create a new Zenodo upload.
 - [ ] Set resource type to `Publication / Preprint`.
 - [ ] Set title to `Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair`.
-- [ ] Add both creators exactly:
+- [ ] Add all creators exactly:
   - Mainasara Al-amin Tsowa `<mainasara@qrk.ng>`
   - Babangida Usman Tsowa `<babangida@qrk.ng>`
+  - Abdul-malik Abdullahi Mustapha `<maleek@qrk.ng>`
 - [ ] Add ORCID IDs if available.
 - [ ] Paste the abstract from the paper.
 - [ ] Set access to open.
 - [ ] Set license to `Creative Commons Attribution 4.0 International`.
 - [ ] Reserve DOI before final publication if the DOI should appear in the PDF.
-- [ ] Replace all `10.5281/zenodo.TODO` placeholders after reserving the DOI.
+- [ ] Verify the reserved DOI `10.5281/zenodo.20796190` appears consistently in the metadata.
 - [ ] Upload paper PDF, Typst source, bibliography, figures, and markdown drafts.
 - [ ] Add related identifiers:
   - GitHub repository URL.

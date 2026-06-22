@@ -21,6 +21,7 @@ Creators:
 ```text
 Tsowa, Mainasara Al-amin <mainasara@qrk.ng>
 Tsowa, Babangida Usman <babangida@qrk.ng>
+Mustapha, Abdul-malik Abdullahi <maleek@qrk.ng>
 ```
 
 Description / abstract:
@@ -115,12 +116,12 @@ or the convenience archive:
 zenodo/dabe_zenodo_deposit_2026-06-22.zip
 ```
 
-## DOI Placeholder
+## Reserved DOI
 
-Current placeholder:
+Current reserved DOI:
 
 ```text
-10.5281/zenodo.TODO
+10.5281/zenodo.20796190
 ```
 
 After reserving a DOI, run:

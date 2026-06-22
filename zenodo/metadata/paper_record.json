@@ -13,6 +13,11 @@
       "name": "Tsowa, Babangida Usman",
       "affiliation": "Qrk Labs",
       "email": "babangida@qrk.ng"
+    },
+    {
+      "name": "Mustapha, Abdul-malik Abdullahi",
+      "affiliation": "Qrk Labs",
+      "email": "maleek@qrk.ng"
     }
   ],
   "description": "Modern subword tokenizers allocate lexical capacity through a fixed segmentation policy rather than through local span difficulty. This paper studies Density-Adaptive Bitmask Encoding (DABE), a learned tokenizer-autoencoder that compresses fixed 64-token GPT-2-token chunks into binary codes and spends sparse lexical repair capacity only where reconstruction is difficult. Across controlled TinyStories experiments, fixed chunks plus adaptive sparse lexical repair outperform matched fixed-rate learned compression and variable-window alternatives at approximately 20 bits/token.",
@@ -37,5 +42,5 @@
       "resource_type": "software"
     }
   ],
-  "notes": "DOI placeholder: 10.5281/zenodo.TODO. Reserve a DOI in the Zenodo draft, replace the placeholder in metadata and manuscript if desired, then publish."
+  "notes": "Reserved paper DOI: 10.5281/zenodo.20796190. Verify the metadata and manuscript agree before publishing."
 }

@@ -10,6 +10,10 @@
     {
       "name": "Tsowa, Babangida Usman",
       "affiliation": "Qrk Labs"
+    },
+    {
+      "name": "Mustapha, Abdul-malik Abdullahi",
+      "affiliation": "Qrk Labs"
     }
   ],
   "description": "Software and lightweight reproducibility artifacts for the paper Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair. The artifact includes source code, selected configs, figure generation data, experiment logs, launch contracts, and Modal JSON/CSV summaries supporting the paper's fixed-chunk sparse-repair tokenizer-autoencoder results.",
@@ -26,7 +30,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "10.5281/zenodo.TODO",
+      "identifier": "10.5281/zenodo.20796190",
       "relation": "isSupplementTo",
       "resource_type": "publication-preprint"
     }

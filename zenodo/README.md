@@ -38,8 +38,9 @@ artifacts, and unrelated temporary files.
 
 1. Create a Zenodo draft for the paper record.
 2. Use Zenodo's reserve DOI option.
-3. Replace `10.5281/zenodo.TODO` in the files under `zenodo/metadata/` and, if
-   desired, in the manuscript title page or code/data availability section.
+3. Verify the reserved DOI `10.5281/zenodo.20796190` in the files under
+   `zenodo/metadata/` and, if desired, in the manuscript title page or
+   code/data availability section.
 4. Rebuild the PDF and rerun the bundle script.
 5. Upload the final bundle contents and publish.
 
@@ -52,6 +53,7 @@ authors, version, DOI, and license.
 - Authors:
   - Mainasara Al-amin Tsowa `<mainasara@qrk.ng>`
   - Babangida Usman Tsowa `<babangida@qrk.ng>`
+  - Abdul-malik Abdullahi Mustapha `<maleek@qrk.ng>`
 - Repository: `git@github.com:qrk-labs/dabe-clean-20260619.git`
 - Current local branch at packaging time: `exp/093-fixed-rate-20bpt-baseline`
 - Source commit: recorded dynamically in `zenodo/deposit/bundle_summary.json`

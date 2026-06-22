@@ -8,12 +8,12 @@
     "paper_record": {
       "resource_type": "Publication / Preprint",
       "license": "CC-BY-4.0",
-      "doi": "10.5281/zenodo.TODO"
+      "doi": "10.5281/zenodo.20796190"
     },
     "software_artifact_record": {
       "resource_type": "Software",
       "license": "MIT",
-      "doi": "10.5281/zenodo.TODO"
+      "doi": "10.5281/zenodo.20796190"
     }
   },
   "experiments": [
