@@ -88,3 +88,14 @@ EXP-098 and EXP-099 train the feasibility DABE LM and a GPT-2 BPE baseline LM on
 | GPT-2 BPE baseline LM | `0.05455` | `1.05606` | `0.98012` | `0.99918` | `21941` | `2741` |
 
 The learned DABE tokenizer reports `3.66321x` compression ratio vs GPT-2 BPE on this corpus, with a small learned vocabulary of `74` code-domain span tokens. EXP-099 confirms that the lower LM loss is reflected in argmax completion accuracy rather than only calibration. EXP-100 then tests reconstruction directly with the same sparse-repair tokenizer-autoencoder family used for the TinyStories anchor: after code-domain training, the deterministic code generator reaches `1.0` token accuracy, `1.0` exact chunk accuracy, and `0.0` mean chunk deviation at `16.20189` observed bits/token. The result suggests that code-domain exposure can reverse the zero-shot weakness seen in EXP-097, but because the corpus is deterministic and repetitive, it should be cited as a controlled domain-adaptation pilot rather than as general Python-code performance.
+
+The completion examples make the representation difference concrete. DABE completes learned code-span tokens, while the GPT-2 BPE baseline completes subword pieces:
+
+| Context | DABE prediction | DABE target | BPE prediction | BPE target |
+|---------|-----------------|-------------|----------------|------------|
+| `def` | `add_user(users,` | `add_user(users,` | ` add` | ` add` |
+| `def add_user(users,` | `name):` | `name):` | `_` | `_` |
+| `... name):` | `users.append({'name':` | `users.append({'name':` | `user` | `user` |
+| `... 'active':` | `true})` | `true})` | `(` | `(` |
+
+DABE's observed mistakes are correspondingly chunkier: repeated-loop contexts sometimes confuse `value` with `skipped.append(idx)`, and repeated `result =` contexts can prefer `{'error':` over `client.fetch(user_id=user_id,`. BPE's observed mistakes are mostly whitespace or subword-local, such as predicting a space where the target is ` self`. This qualitative contrast supports the paper's mechanism story: learned span tokens can carry useful code-local structure, but the current evidence remains a controlled repeated-generator result.

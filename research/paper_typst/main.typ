@@ -340,6 +340,33 @@ This ablation narrows the paper's mechanism claim. Adaptive granularity is usefu
 
 @fig-repairtrace makes the repair mechanism observable. In this diagnostic chunk, the gist stream reconstructs only 62.5% of tokens, confusing scene words such as "sun", "sky", and "cloud" with plausible but wrong alternatives. The repaired decode reaches 98.4% token accuracy on the same chunk, with 23 positions corrected. The trace is the intended interpretation of sparse repair as an inspectable budget, not an opaque black box.
 
+== Code-Domain Completion Control
+
+#exp[099] and #exp[100] test whether the code failure in #exp[097] is a domain-exposure issue rather than a hard representational limit. These runs use the deterministic Python-code generator as a controlled probe, not as a broad Python benchmark. On next-token completion, the #dabe LM reaches 0.98964 accuracy versus 0.98012 for the GPT-2 BPE baseline. On reconstruction, the code-trained sparse-repair tokenizer reaches 1.0 token accuracy, 1.0 exact chunk accuracy, and 0.0 mean chunk deviation at 16.20189 observed #bpt.
+
+#figure(
+  table(
+    columns: (1.4fr, 2.1fr, 2.1fr),
+    inset: 5pt,
+    table.header([Context], [#dabe completion], [GPT-2 BPE completion]),
+    [#raw("def")],
+    [#raw("add_user(users,") => #raw("name):")],
+    [#raw(" add") => #raw("_") => #raw("user")],
+    [#raw("def add_user(users,")],
+    [#raw("name):")],
+    [#raw("_")],
+    [#raw("... name):")],
+    [#raw("users.append({'name':")],
+    [#raw("user")],
+    [#raw("... 'active':")],
+    [#raw("true})")],
+    [#raw("(")],
+  ),
+  caption: [Completion examples from #exp[099]. #dabe predicts learned code-span tokens, while the BPE baseline predicts subword pieces.],
+) <tab-code-completions>
+
+@tab-code-completions makes the tokenization difference visible. #dabe's successful predictions are larger code-local units such as `add_user(users,`, `name):`, and `users.append({'name':`. Its observed mistakes are also chunkier: repeated loop contexts can confuse `value` with `skipped.append(idx)`, and repeated `result =` contexts can prefer `{'error':` over `client.fetch(user_id=user_id,`. By contrast, BPE's observed mistakes are often whitespace or subword-local, such as predicting a space where the target is ` self`. This supports the mechanism interpretation without overstating the dataset: code-domain training can make the learned span tokenizer behave sensibly on code-like text, but the current corpus is still small and repeated.
+
 = Analysis
 
 #strong[Why sparse repair works.] The gist path turns the chunk code into a smooth whole-span prior. This is useful for predictable text, but exact token reconstruction is brittle around names, punctuation, dialogue markers, and other locally high-information regions. Sparse repair gives the model an explicit way to allocate lexical precision to these holes. @eq-chunk-deviation makes the consequence measurable: the target is not vague semantic similarity, but fewer wrong tokens per chunk.
@@ -348,7 +375,7 @@ This ablation narrows the paper's mechanism claim. Adaptive granularity is usefu
 
 #strong[Inference overhead.] #exp[096] provides the matched no-lookup decode profile for #exp[094]. Fixed-rate decoding reaches 32930 tokens/s and 852.80 MiB peak allocated memory, while sparse repair reaches 13461 tokens/s and 2031.74 MiB. Sparse repair is therefore about 2.45x slower and 2.38x larger in allocated memory on this T4 diagnostic path, traded for a token-accuracy increase from 0.72025 to 0.91549.
 
-#strong[Code-like text.] #exp[097] evaluates the #exp[087] quality-anchor checkpoint zero-shot on a deterministic Python-code corpus. Code stresses different reconstruction behavior than TinyStories: identifiers, indentation, brackets, operators, string delimiters, and numeric literals carry exact meaning. The result is a deliberate scope check rather than a success claim: token accuracy drops to 0.41761 with 37.27273 mean chunk deviation, while active $K$ rises to 16.0. The model recognizes code as difficult and spends repair budget, but the TinyStories-trained lexical repair content is not code-calibrated.
+#strong[Code-like text.] #exp[097] evaluates the #exp[087] quality-anchor checkpoint zero-shot on a deterministic Python-code corpus. Code stresses different reconstruction behavior than TinyStories: identifiers, indentation, brackets, operators, string delimiters, and numeric literals carry exact meaning. The result is a deliberate scope check rather than a success claim: token accuracy drops to 0.41761 with 37.27273 mean chunk deviation, while active $K$ rises to 16.0. The model recognizes code as difficult and spends repair budget, but the TinyStories-trained lexical repair content is not code-calibrated. #exp[099] and #exp[100] provide the complementary in-domain control: after code-domain training on the deterministic generator, the LM completion metric and tokenizer reconstruction metric both improve sharply.
 
 #strong[What remains open.] The cost-aware knee shows a path toward better compression, but it also shows that cost pressure alone diminishes on either side of 0.025. The next architectural question is how to improve lookup correctness and router calibration at a fixed active $K$.
 
@@ -356,7 +383,7 @@ This ablation narrows the paper's mechanism claim. Adaptive granularity is usefu
 
 This study is intentionally framed as tokenizer-autoencoder rate-distortion rather than full downstream language-model pretraining. That choice isolates the tokenization mechanism: the experiments measure how chunk codes, sparse repair, and routing policies affect reconstruction before adding the confounds of language-model scale, optimizer schedules, and downstream task selection. The matched 20 #bpt comparison is therefore the central evidence unit for the paper.
 
-The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; #exp[097] makes that boundary explicit by reaching only 0.41761 token accuracy on deterministic Python code. The current paper establishes a clean mechanism result that should next be tested on broader corpora, code, multilingual data, and full LM training.
+The main experiments use TinyStories as a controlled text domain with exact GPT-2-token reconstruction metrics. This setting makes it possible to compare architectural variants under the same token basis, chunk length, training budget, and validation protocol. Domain generalization remains a separate evaluation target; #exp[097] makes that boundary explicit by reaching only 0.41761 token accuracy on deterministic Python code. #exp[099] and #exp[100] show that code-domain training can produce favorable completion and reconstruction results on the same deterministic generator, but that generator is intentionally small and repetitive. The current paper establishes a clean mechanism result that should next be tested on broader corpora, real code repositories, multilingual data, and full LM training.
 
 The run plan prioritizes focused, objective comparisons over broad exploratory sweeps. The experiment set includes a matched fixed-rate comparator, a replicated cost-knee neighborhood around #exp[092], a quality anchor in #exp[087], and direct variable-window ablations. Additional seeds and larger-scale runs would support confidence intervals and scaling laws, but they are not required to interpret the main matched-rate separation.
 
