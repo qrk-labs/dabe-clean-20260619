@@ -1,0 +1,670 @@
+{
+  "source_run_id": "exp099_modal_python_code_completion_metrics_001",
+  "dataset_name": "__python_code__",
+  "seq_len": 64,
+  "num_examples_requested": 10,
+  "max_windows": 128,
+  "dabe": {
+    "checkpoint": "/vol/experiments/exp099_modal_python_code_completion_metrics_001/dabe_lm/lightning_logs/version_0/checkpoints/epoch=0-step=439.ckpt",
+    "examples": [
+      {
+        "window_index": 0,
+        "position": 0,
+        "context_tail": [
+          "def"
+        ],
+        "target": "add_user(users,",
+        "prediction": "add_user(users,",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 1,
+        "context_tail": [
+          "def",
+          "add_user(users,"
+        ],
+        "target": "name):",
+        "prediction": "name):",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 2,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):"
+        ],
+        "target": "users.append({'name':",
+        "prediction": "users.append({'name':",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 3,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':"
+        ],
+        "target": "name,",
+        "prediction": "name,",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 4,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,"
+        ],
+        "target": "'active':",
+        "prediction": "'active':",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 5,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,",
+          "'active':"
+        ],
+        "target": "true})",
+        "prediction": "true})",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 6,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,",
+          "'active':",
+          "true})"
+        ],
+        "target": "return",
+        "prediction": "return",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 7,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,",
+          "'active':",
+          "true})",
+          "return"
+        ],
+        "target": "users",
+        "prediction": "users",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 8,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,",
+          "'active':",
+          "true})",
+          "return",
+          "users"
+        ],
+        "target": "def",
+        "prediction": "def",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 9,
+        "context_tail": [
+          "def",
+          "add_user(users,",
+          "name):",
+          "users.append({'name':",
+          "name,",
+          "'active':",
+          "true})",
+          "return",
+          "users",
+          "def"
+        ],
+        "target": "add_user(users,",
+        "prediction": "add_user(users,",
+        "correct": true
+      }
+    ],
+    "mistakes": [
+      {
+        "window_index": 3,
+        "position": 17,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 3,
+        "position": 33,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 3,
+        "position": 49,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 3,
+        "position": 54,
+        "context_tail": [
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,",
+          "value",
+          "in",
+          "enumerate(values):",
+          "if",
+          "value"
+        ],
+        "target": "%",
+        "prediction": "else:",
+        "correct": false
+      },
+      {
+        "window_index": 4,
+        "position": 1,
+        "context_tail": [
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "enumerate(values):",
+        "correct": false
+      },
+      {
+        "window_index": 4,
+        "position": 17,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 4,
+        "position": 33,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 4,
+        "position": 49,
+        "context_tail": [
+          "%",
+          "2",
+          "==",
+          "0:",
+          "total",
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,"
+        ],
+        "target": "value",
+        "prediction": "skipped.append(idx)",
+        "correct": false
+      },
+      {
+        "window_index": 4,
+        "position": 54,
+        "context_tail": [
+          "+=",
+          "value",
+          "else:",
+          "skipped.append(idx)",
+          "for",
+          "idx,",
+          "value",
+          "in",
+          "enumerate(values):",
+          "if",
+          "value"
+        ],
+        "target": "%",
+        "prediction": "else:",
+        "correct": false
+      },
+      {
+        "window_index": 7,
+        "position": 24,
+        "context_tail": [
+          "client.fetch(user_id=user_id,",
+          "timeout=3.0)",
+          "except",
+          "timeouterror:",
+          "result",
+          "=",
+          "{'error':",
+          "'timeout'}",
+          "try:",
+          "result",
+          "="
+        ],
+        "target": "client.fetch(user_id=user_id,",
+        "prediction": "{'error':",
+        "correct": false
+      }
+    ],
+    "windows_inspected": 128,
+    "validation_windows": 439
+  },
+  "bpe": {
+    "checkpoint": "/vol/experiments/exp099_modal_python_code_completion_metrics_001/bpe_baseline/lightning_logs/version_0/checkpoints/epoch=0-step=2743.ckpt",
+    "examples": [
+      {
+        "window_index": 0,
+        "position": 0,
+        "context_tail": [
+          "def"
+        ],
+        "target": " add",
+        "prediction": " add",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 1,
+        "context_tail": [
+          "def",
+          " add"
+        ],
+        "target": "_",
+        "prediction": "_",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 2,
+        "context_tail": [
+          "def",
+          " add",
+          "_"
+        ],
+        "target": "user",
+        "prediction": "user",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 3,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user"
+        ],
+        "target": "(",
+        "prediction": "(",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 4,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "("
+        ],
+        "target": "users",
+        "prediction": "users",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 5,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "(",
+          "users"
+        ],
+        "target": ",",
+        "prediction": ",",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 6,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "(",
+          "users",
+          ","
+        ],
+        "target": " name",
+        "prediction": " name",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 7,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "(",
+          "users",
+          ",",
+          " name"
+        ],
+        "target": "):",
+        "prediction": "):",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 8,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "(",
+          "users",
+          ",",
+          " name",
+          "):"
+        ],
+        "target": "\n",
+        "prediction": "\n",
+        "correct": true
+      },
+      {
+        "window_index": 0,
+        "position": 9,
+        "context_tail": [
+          "def",
+          " add",
+          "_",
+          "user",
+          "(",
+          "users",
+          ",",
+          " name",
+          "):",
+          "\n"
+        ],
+        "target": " ",
+        "prediction": " ",
+        "correct": true
+      }
+    ],
+    "mistakes": [
+      {
+        "window_index": 2,
+        "position": 1,
+        "context_tail": [
+          " ",
+          " "
+        ],
+        "target": " return",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 6,
+        "position": 0,
+        "context_tail": [
+          "'"
+        ],
+        "target": "name",
+        "prediction": "}",
+        "correct": false
+      },
+      {
+        "window_index": 7,
+        "position": 21,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 8,
+        "position": 52,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 9,
+        "position": 20,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 10,
+        "position": 0,
+        "context_tail": [
+          "("
+        ],
+        "target": "self",
+        "prediction": "session",
+        "correct": false
+      },
+      {
+        "window_index": 10,
+        "position": 51,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 11,
+        "position": 19,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 12,
+        "position": 50,
+        "context_tail": [
+          "(",
+          "self",
+          "):",
+          "\n",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " self",
+        "prediction": " ",
+        "correct": false
+      },
+      {
+        "window_index": 13,
+        "position": 3,
+        "context_tail": [
+          "\n",
+          " ",
+          " ",
+          " "
+        ],
+        "target": " def",
+        "prediction": " mean",
+        "correct": false
+      }
+    ],
+    "windows_inspected": 128,
+    "validation_windows": 2741
+  }
+}

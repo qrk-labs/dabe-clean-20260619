@@ -50,11 +50,13 @@
 | Pipeline summary | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/pipeline_summary.json` |
 | DABE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/dabe_lm_stage_result.json` |
 | BPE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/bpe_baseline_stage_result.json` |
+| Completion examples | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/completion_examples.json` |
 
 ### Key Observations
 - EXP-099 confirms that EXP-098's favorable loss was not hiding poor argmax completion: DABE's next-token completion accuracy is also higher than BPE on this deterministic Python-code pilot.
 - The near-saturated top-k metrics show that this generator is easy after in-domain training; cite it as a controlled domain-adaptation check, not a broad Python benchmark.
 - Chunk deviation remains a tokenizer-autoencoder reconstruction metric, so EXP-100 is running separately for the deviation comparison.
+- The completion example probe shows the qualitative tokenization difference directly: DABE predicts learned code-span tokens such as `add_user(users,` and `users.append({'name':`, while BPE predicts GPT-2 subword pieces such as ` add`, `_`, and `user`.
 
 ### Status: [COMPLETE]
 
