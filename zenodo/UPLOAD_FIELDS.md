@@ -121,7 +121,7 @@ zenodo/dabe_zenodo_deposit_2026-06-22.zip
 Current reserved DOI:
 
 ```text
-10.5281/zenodo.20796190
+10.5281/zenodo.20797432
 ```
 
 After reserving a DOI, run:

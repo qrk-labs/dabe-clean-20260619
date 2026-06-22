@@ -169,12 +169,12 @@ def write_bundle_summary(deposit: Path, repo: Path) -> None:
         "paper_record": {
             "resource_type": "Publication / Preprint",
             "license": "CC-BY-4.0",
-            "doi": "10.5281/zenodo.20796190",
+            "doi": "10.5281/zenodo.20797432",
         },
         "software_artifact_record": {
             "resource_type": "Software",
             "license": "MIT",
-            "doi": "10.5281/zenodo.20796190",
+            "doi": "10.5281/zenodo.20797432",
         },
         "excluded_by_design": [
             "model checkpoints",

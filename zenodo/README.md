@@ -38,7 +38,7 @@ artifacts, and unrelated temporary files.
 
 1. Create a Zenodo draft for the paper record.
 2. Use Zenodo's reserve DOI option.
-3. Verify the reserved DOI `10.5281/zenodo.20796190` in the files under
+3. Verify the reserved DOI `10.5281/zenodo.20797432` in the files under
    `zenodo/metadata/` and, if desired, in the manuscript title page or
    code/data availability section.
 4. Rebuild the PDF and rerun the bundle script.

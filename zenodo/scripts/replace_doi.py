@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-PLACEHOLDERS = ["10.5281/zenodo.TODO", "10.5281/zenodo.20796190"]
+PLACEHOLDERS = ["10.5281/zenodo.TODO", "10.5281/zenodo.20796190", "10.5281/zenodo.20797432"]
 TARGETS = [
     "CITATION.cff",
     ".zenodo.json",

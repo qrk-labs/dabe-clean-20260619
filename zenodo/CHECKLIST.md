@@ -14,7 +14,7 @@
 - [ ] Set access to open.
 - [ ] Set license to `Creative Commons Attribution 4.0 International`.
 - [ ] Reserve DOI before final publication if the DOI should appear in the PDF.
-- [ ] Verify the reserved DOI `10.5281/zenodo.20796190` appears consistently in the metadata.
+- [ ] Verify the reserved DOI `10.5281/zenodo.20797432` appears consistently in the metadata.
 - [ ] Upload paper PDF, Typst source, bibliography, figures, and markdown drafts.
 - [ ] Add related identifiers:
   - GitHub repository URL.
