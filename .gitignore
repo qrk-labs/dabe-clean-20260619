@@ -48,6 +48,12 @@ tmp/
 zenodo/deposit/
 zenodo/*.zip
 
+# Local generated TMLR export artifacts; Typst is the canonical paper source.
+research/paper_tex/main_tmlr.*
+research/paper_tex/tmlr-ready.pdf
+research/paper_tex/tmlr.bst
+research/paper_tex/tmlr.sty
+
 # EXP-094 duplicates full diagnostics in these wrapper payloads; keep decode_diagnostics.json instead.
 experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/pipeline_summary.json
 experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/stage_result.json
