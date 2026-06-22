@@ -1,0 +1,20 @@
+{
+  "launched_at": "2026-06-21T23:07:00+01:00",
+  "run_id": "exp098_modal_python_code_bpe_dabe_concurrent_002",
+  "app_id": "ap-DeQJk6bEQci52rfw5XjSh5",
+  "status": "failed",
+  "function": "scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent",
+  "config_name": "feasibility_python_code_smoke",
+  "git_commit": "0878aa3",
+  "gpu": "T4",
+  "timeout_seconds": 2400,
+  "execution_mode": "tokenizer_then_concurrent_dabe_lm_and_bpe_baseline",
+  "dataset_name": "__python_code__",
+  "train_samples": 2048,
+  "val_samples": 256,
+  "code_sample_repeat_factor": 8,
+  "periodic_commit_seconds": 120,
+  "modal_url": "https://modal.com/apps/qrk-labs/main/ap-DeQJk6bEQci52rfw5XjSh5",
+  "failure": "Both trainers reached max_epochs=1, then concurrent Lightning Rich progress teardown failed with IndexError: pop from empty list.",
+  "decision": "Relaunch with logging.enable_progress_bar=false."
+}

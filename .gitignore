@@ -38,3 +38,20 @@ experiments/**/logs/
 experiments/**/checkpoints/
 experiments/**/artifacts/
 experiments/**/wandb/
+
+# Workspace-local binary tool installs
+research/.tools/
+tmp/
+
+# Generated Zenodo upload bundles. Keep metadata/scripts in Git, rebuild these
+# locally when reserving the final DOI or preparing an upload.
+zenodo/deposit/
+zenodo/*.zip
+
+# EXP-094 duplicates full diagnostics in these wrapper payloads; keep decode_diagnostics.json instead.
+experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/pipeline_summary.json
+experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/stage_result.json
+.DS_Store
+# Diagnostic stage_result payloads duplicate decode_diagnostics.json for these paper-defense probes.
+experiments/modal_downloads/exp096_modal_dabe_fixed20_inference_diag_001/stage_result.json
+experiments/modal_downloads/exp097_modal_dabe_python_code_diag_001/stage_result.json

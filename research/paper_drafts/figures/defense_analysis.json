@@ -1,0 +1,138 @@
+{
+  "bitrate_calibration": {
+    "gpt2_vocab_size": 50257,
+    "log2_gpt2_vocab_index_bits": 15.617036934287741,
+    "fixed_baseline_bits_per_token": 20.0,
+    "sparse_repair_observed_bits_per_token_range": [
+      20.06207,
+      20.37236
+    ],
+    "scope_note": "These are learned GPT-2-token-ID reconstruction rates, not claims of raw-text compression superiority over BPE."
+  },
+  "diagnostic_ci_method": "Token accuracy CI uses Wilson interval over validation token positions. Chunk-deviation CI uses a parametric bootstrap from the observed token-error rate because current diagnostic artifacts did not store every validation chunk deviation.",
+  "diagnostics": [
+    {
+      "run_id": "exp094_modal_dabe_repair_trace_diag_001",
+      "chunks": 1351,
+      "tokens": 86464,
+      "token_acc": 0.9154908401184307,
+      "token_acc_ci95_wilson": [
+        0.9136182976173564,
+        0.9173264637007057
+      ],
+      "chunk_deviation_mean": 5.408586232420429,
+      "chunk_deviation_mean_ci95_parametric_bootstrap": [
+        5.290155440414508,
+        5.526295336787563
+      ],
+      "chunk_deviation_p90": 9.0,
+      "tokens_per_second": 13461.431303092839,
+      "chunks_per_second": 210.3348641108256,
+      "gpu_peak_memory_allocated_mb": 2031.7421875,
+      "gpu_peak_memory_reserved_mb": 2152.0,
+      "observed_effective_bits_per_token": 20.440202852428445,
+      "exact_chunk_acc": 0.01998519615099926,
+      "exact_block_acc": 0.30199851961509994,
+      "bit_density": 0.49131131172180176,
+      "lookup_active_k_mean": 9.372316802368616,
+      "corrected_samples": 64
+    },
+    {
+      "run_id": "exp096_modal_dabe_fixed20_inference_diag_001",
+      "chunks": 1351,
+      "tokens": 86464,
+      "token_acc": 0.7202535159141377,
+      "token_acc_ci95_wilson": [
+        0.7172517683116768,
+        0.7232356926358854
+      ],
+      "chunk_deviation_mean": 17.90377498149519,
+      "chunk_deviation_mean_ci95_parametric_bootstrap": [
+        17.714285714285715,
+        18.094744633604737
+      ],
+      "chunk_deviation_p90": 25.0,
+      "tokens_per_second": 32930.44183406488,
+      "chunks_per_second": 514.5381536572637,
+      "gpu_peak_memory_allocated_mb": 852.7998046875,
+      "gpu_peak_memory_reserved_mb": 974.0,
+      "observed_effective_bits_per_token": 20.0,
+      "exact_chunk_acc": 0.0,
+      "exact_block_acc": 0.05773501110288675,
+      "bit_density": 0.4871645341085833,
+      "lookup_active_k_mean": 0.0,
+      "corrected_samples": 0
+    },
+    {
+      "run_id": "exp097_modal_dabe_python_code_diag_001",
+      "chunks": 704,
+      "tokens": 45056,
+      "token_acc": 0.41761363636363635,
+      "token_acc_ci95_wilson": [
+        0.4130670622090733,
+        0.4221742583019159
+      ],
+      "chunk_deviation_mean": 37.27272727272727,
+      "chunk_deviation_mean_ci95_parametric_bootstrap": [
+        36.98295454545455,
+        37.5625
+      ],
+      "chunk_deviation_p90": 44.0,
+      "tokens_per_second": 12326.607349962931,
+      "chunks_per_second": 192.6032398431708,
+      "gpu_peak_memory_allocated_mb": 2031.7421875,
+      "gpu_peak_memory_reserved_mb": 2152.0,
+      "observed_effective_bits_per_token": 21.369382828474045,
+      "exact_chunk_acc": 0.0,
+      "exact_block_acc": 0.0,
+      "bit_density": 0.49400745738636365,
+      "lookup_active_k_mean": 16.0,
+      "corrected_samples": 32
+    }
+  ],
+  "exp095": {
+    "run_id": "exp095_modal_dabe_fixed_rate_20bpt_24k_001",
+    "status": "timed_out_at_step_23500_of_24000_after_best_checkpoint_saved",
+    "val_rows": 66,
+    "best_by_token_acc": {
+      "step": 22185,
+      "epoch": 62,
+      "val_loss": 1.178973913192749,
+      "token_acc": 0.7732350826263428,
+      "token_top5_acc": 0.8947654366493225,
+      "token_top10_acc": 0.9231125116348267,
+      "chunk_deviation_mean": 14.512953758239746,
+      "chunk_deviation_p90": 20.755144119262695,
+      "bit_density": 0.48891788721084595,
+      "exact_chunk_acc": 0.0,
+      "exact_block_avg": 0.07753515988588333,
+      "block_exact_acc": [
+        0.23538120090961456,
+        0.03034789115190506,
+        0.02590673603117466,
+        0.018504811450839043
+      ]
+    },
+    "last_validation": {
+      "step": 23244,
+      "epoch": 65,
+      "val_loss": 1.1950896978378296,
+      "token_acc": 0.7711070775985718,
+      "token_top5_acc": 0.8962805271148682,
+      "token_top10_acc": 0.9247663617134094,
+      "chunk_deviation_mean": 14.649148941040039,
+      "chunk_deviation_p90": 20.945375442504883,
+      "bit_density": 0.4850863218307495,
+      "exact_chunk_acc": 0.0,
+      "exact_block_avg": 0.07216876232996583,
+      "block_exact_acc": [
+        0.22205772995948792,
+        0.028127312660217285,
+        0.019985195249319077,
+        0.018504811450839043
+      ]
+    },
+    "timeout_step_observed": 23500,
+    "remote_best_checkpoint": "/experiments/exp095_modal_dabe_fixed_rate_20bpt_24k_001/checkpoints/best-step-0022000.ckpt"
+  }
+}

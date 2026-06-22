@@ -1,0 +1,42 @@
+{
+  "title": "DABE Paper Artifact: Fixed Chunks with Sparse Lexical Repair",
+  "upload_type": "software",
+  "publication_date": "2026-06-22",
+  "creators": [
+    {
+      "name": "Tsowa, Mainasara Al-amin",
+      "affiliation": "Qrk Labs",
+      "email": "mainasara@qrk.ng"
+    },
+    {
+      "name": "Tsowa, Babangida Usman",
+      "affiliation": "Qrk Labs",
+      "email": "babangida@qrk.ng"
+    }
+  ],
+  "description": "Software and lightweight reproducibility artifacts for the DABE paper, including source code, selected configs, figure generation data, experiment logs, launch contracts, and Modal JSON/CSV summaries. The artifact supports the paper's central claim that fixed 64-token chunks plus adaptive sparse lexical repair outperform fixed-rate learned chunk compression and adaptive token-window geometry in the tested tokenizer-autoencoder setting.",
+  "access_right": "open",
+  "license": "mit-license",
+  "version": "paper-v1",
+  "keywords": [
+    "learned tokenization",
+    "rate-distortion",
+    "sparse lexical repair",
+    "tokenizer autoencoder",
+    "DABE",
+    "reproducibility artifact"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.TODO",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-preprint"
+    },
+    {
+      "identifier": "https://github.com/qrk-labs/dabe-clean-20260619",
+      "relation": "isSupplementedBy",
+      "resource_type": "software"
+    }
+  ],
+  "notes": "Code is MIT licensed. Paper text, figures, and drafts are CC-BY-4.0; see zenodo/LICENSES.md."
+}

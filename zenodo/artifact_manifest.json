@@ -1,0 +1,123 @@
+{
+  "title": "DABE paper artifact manifest",
+  "paper_title": "Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair",
+  "prepared_date": "2026-06-22",
+  "prepared_from_commit": "recorded in generated zenodo/deposit/bundle_summary.json",
+  "repository": "git@github.com:qrk-labs/dabe-clean-20260619.git",
+  "records": {
+    "paper_record": {
+      "resource_type": "Publication / Preprint",
+      "license": "CC-BY-4.0",
+      "doi": "10.5281/zenodo.TODO"
+    },
+    "software_artifact_record": {
+      "resource_type": "Software",
+      "license": "MIT",
+      "doi": "10.5281/zenodo.TODO"
+    }
+  },
+  "experiments": [
+    {
+      "id": "EXP-087",
+      "role": "Quality anchor for fixed chunks plus gist/residual sparse lexical repair",
+      "token_accuracy": 0.91547,
+      "chunk_deviation_mean": 5.41007,
+      "observed_bits_per_token": 20.37236,
+      "artifact_root": "experiments/modal_downloads/exp087_modal_dabe_gist_residual_router_sweep_001"
+    },
+    {
+      "id": "EXP-088",
+      "role": "Quantile-supervised variable-window negative ablation",
+      "token_accuracy": 0.85820,
+      "chunk_deviation_mean": 9.07550,
+      "observed_bits_per_token": 19.46092,
+      "artifact_root": "experiments/modal_downloads/exp088_modal_dabe_gist_residual_variable_windows_001"
+    },
+    {
+      "id": "EXP-089",
+      "role": "Action-value variable-window ablation",
+      "token_accuracy": 0.87508,
+      "chunk_deviation_mean": 7.99482,
+      "observed_bits_per_token": 18.29175,
+      "artifact_root": "experiments/modal_downloads/exp089_modal_dabe_action_window_router_001"
+    },
+    {
+      "id": "EXP-090",
+      "role": "Hard straight-through variable-window ablation",
+      "token_accuracy": 0.87209,
+      "chunk_deviation_mean": 8.18653,
+      "observed_bits_per_token": 21.70567,
+      "artifact_root": "experiments/modal_downloads/exp090_modal_dabe_straight_through_window_router_001"
+    },
+    {
+      "id": "EXP-092",
+      "role": "Replicated cost-aware sparse-repair knee",
+      "token_accuracy": 0.89274,
+      "chunk_deviation_mean": 6.86454,
+      "observed_bits_per_token": 20.06207,
+      "artifact_root": "experiments/modal_downloads/exp092_modal_dabe_cost_knee_repl_001"
+    },
+    {
+      "id": "EXP-093",
+      "role": "Matched fixed-rate 20 bits/token no-lookup comparator",
+      "token_accuracy": 0.72045,
+      "chunk_deviation_mean": 17.89119,
+      "observed_bits_per_token": 20.0,
+      "artifact_root": "experiments/modal_downloads/exp093_modal_dabe_fixed_rate_20bpt_001"
+    },
+    {
+      "id": "EXP-094",
+      "role": "Sparse-repair trace and sparse-repair inference profile",
+      "token_accuracy": 0.91549,
+      "chunk_deviation_mean": 5.40859,
+      "tokens_per_second": 13461,
+      "peak_allocated_mib": 2031.74,
+      "artifact_root": "experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001"
+    },
+    {
+      "id": "EXP-095",
+      "role": "Longer fixed-rate convergence-defense run",
+      "token_accuracy": 0.77324,
+      "chunk_deviation_mean": 14.51295,
+      "observed_bits_per_token": 20.0,
+      "artifact_root": "experiments/modal_downloads/exp095_modal_dabe_fixed_rate_20bpt_24k_001"
+    },
+    {
+      "id": "EXP-096",
+      "role": "Matched fixed-rate inference benchmark",
+      "token_accuracy": 0.72025,
+      "chunk_deviation_mean": 17.90377,
+      "tokens_per_second": 32930,
+      "peak_allocated_mib": 852.80,
+      "artifact_root": "experiments/modal_downloads/exp096_modal_dabe_fixed20_inference_diag_001"
+    },
+    {
+      "id": "EXP-097",
+      "role": "Zero-shot deterministic Python-code diagnostic",
+      "token_accuracy": 0.41761,
+      "chunk_deviation_mean": 37.27273,
+      "observed_bits_per_token": 21.36938,
+      "artifact_root": "experiments/modal_downloads/exp097_modal_dabe_python_code_diag_001"
+    },
+    {
+      "id": "EXP-098",
+      "role": "Concurrent deterministic Python-code DABE/BPE LM training pilot",
+      "artifact_root": "experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003"
+    },
+    {
+      "id": "EXP-099",
+      "role": "Deterministic Python-code completion metrics and examples",
+      "dabe_next_token_accuracy": 0.98964,
+      "bpe_next_token_accuracy": 0.98012,
+      "artifact_root": "experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001"
+    },
+    {
+      "id": "EXP-100",
+      "role": "Python-code trained sparse-repair reconstruction smoke",
+      "token_accuracy": 1.0,
+      "chunk_deviation_mean": 0.0,
+      "observed_bits_per_token": 16.20189,
+      "artifact_root": "experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001"
+    }
+  ]
+}

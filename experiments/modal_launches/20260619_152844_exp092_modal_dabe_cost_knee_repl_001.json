@@ -1,0 +1,13 @@
+{
+  "launched_at": "2026-06-19T15:28:44+01:00",
+  "command": "modal run -d scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep --config-name dabe_tokenizer_autoencoder_smoke --stages train --periodic-commit-seconds 120 --run-id exp092_modal_dabe_cost_knee_repl_001 --router-loss-csv 0.2 --slot-cost-csv 0.0225,0.025,0.0275 --overrides 'dabe_tokenizer.dataset.dataset_name=roneneldan/TinyStories dabe_tokenizer.dataset.train_samples=4096 dabe_tokenizer.dataset.val_samples=512 dabe_tokenizer.dataset.allow_synthetic_fallback=false dabe_tokenizer.dataset.streaming=true dabe_tokenizer.codec.code_bits=1024 dabe_tokenizer.model.hierarchical_block_tokens=16 dabe_tokenizer.model.lexical_lookup_selector=learned dabe_tokenizer.model.lexical_lookup_copy_scale=4.0 dabe_tokenizer.training.gist_loss_weight=0.25 dabe_tokenizer.training.max_steps=12000 dabe_tokenizer.training.val_check_interval=300 dabe_tokenizer.training.checkpoint_every_n_train_steps=2000 dabe_tokenizer.training.batch_size=32 dabe_tokenizer.training.enable_progress_bar=false'",
+  "return_code": 0,
+  "timed_out_waiting_for_local_process": false,
+  "local_stream_detached_by_interrupt": true,
+  "app_id": "ap-qKUcNh9KiLENQDiXD0Pk2G",
+  "run_id": "exp092_modal_dabe_cost_knee_repl_001",
+  "git_commit": "dd9b77b77e79b59cf977460a46fb0be2d6f106c9",
+  "early_status": "Trainer startup completed; observed [eta] step=300/12000 sps=7.80 eta_min=25.0 for the first child before detaching local log stream.",
+  "log_tail_command": "modal app logs ap-qKUcNh9KiLENQDiXD0Pk2G",
+  "volume_probe": "modal volume ls dabe-experiments /experiments/exp092_modal_dabe_cost_knee_repl_001"
+}

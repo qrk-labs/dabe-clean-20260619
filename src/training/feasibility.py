@@ -39,6 +39,21 @@ def build_causal_mask(seq_len: int, device: torch.device) -> torch.Tensor:
     return mask.unsqueeze(0).unsqueeze(0)
 
 
+def _lm_completion_metrics(logits: torch.Tensor, targets: torch.Tensor) -> dict[str, torch.Tensor]:
+    """Compute next-token completion metrics for feasibility LM comparisons."""
+    flat_logits = logits.reshape(-1, logits.shape[-1])
+    flat_targets = targets.reshape(-1)
+    predictions = flat_logits.argmax(dim=-1)
+    metrics = {
+        "token_acc": (predictions == flat_targets).float().mean(),
+    }
+    for k in (5, 10):
+        usable_k = min(k, flat_logits.shape[-1])
+        topk = torch.topk(flat_logits, k=usable_k, dim=-1).indices
+        metrics[f"top{k}_acc"] = topk.eq(flat_targets.unsqueeze(-1)).any(dim=-1).float().mean()
+    return metrics
+
+
 def _sequence_windows(ids: Sequence[int], seq_len: int) -> list[tuple[list[int], list[int]]]:
     windows: list[tuple[list[int], list[int]]] = []
     if len(ids) <= seq_len:
@@ -83,6 +98,26 @@ def _extract_text_field(example: dict[str, Any], text_field: str) -> str:
     return ""
 
 
+def _python_code_texts(max_samples: int) -> list[str]:
+    """Deterministic Python-code corpus for paper-defense domain probes."""
+    snippets = [
+        "def add_user(users, name):\n    users.append({'name': name, 'active': True})\n    return users\n",
+        "class Cache:\n    def __init__(self):\n        self.items = {}\n\n    def get(self, key, default=None):\n        return self.items.get(key, default)\n",
+        "for idx, value in enumerate(values):\n    if value % 2 == 0:\n        total += value\n    else:\n        skipped.append(idx)\n",
+        "with open(path, 'r', encoding='utf-8') as handle:\n    lines = [line.strip() for line in handle if line.strip()]\n",
+        "try:\n    result = client.fetch(user_id=user_id, timeout=3.0)\nexcept TimeoutError:\n    result = {'error': 'timeout'}\n",
+        "def normalize_batch(batch):\n    mean = sum(batch) / max(len(batch), 1)\n    return [(item - mean) for item in batch]\n",
+        "async def fetch_json(session, url):\n    async with session.get(url, timeout=10) as response:\n        response.raise_for_status()\n        return await response.json()\n",
+    ]
+    samples: list[str] = []
+    for idx in range(max(1, int(max_samples))):
+        snippet = snippets[idx % len(snippets)]
+        # Repeat enough times that both BPE tokens and DABE word-span tokens
+        # produce non-empty 64-step language-model windows.
+        samples.append((snippet + "\n") * 8)
+    return samples
+
+
 def _load_text_dataset_samples(
     dataset_name: str,
     split: str,
@@ -94,6 +129,9 @@ def _load_text_dataset_samples(
     cache_mode: str = "none",
     cache_root: Path | None = None,
 ) -> list[str]:
+    if str(dataset_name) in {"python_code", "__python_code__", "code", "__code__"}:
+        return _python_code_texts(max_samples)
+
     cache_file: Path | None = None
     if cache_root is not None and cache_mode in {"build", "reuse"}:
         key = _hash_key([
@@ -1377,6 +1415,15 @@ class DABECausalLMModule(L.LightningModule):
         self.log(f"dabe/{stage}_base_loss", base_loss)
         self.log(f"dabe/{stage}_mtp_loss", mtp_loss)
         self.log(f"dabe/{stage}_stable", torch.tensor(1.0, device=self.device))
+        for metric_name, metric_value in _lm_completion_metrics(logits, targets).items():
+            self.log(
+                f"dabe/{stage}_{metric_name}",
+                metric_value,
+                prog_bar=stage == "val" and metric_name == "token_acc",
+                on_step=False,
+                on_epoch=True,
+                batch_size=targets.numel(),
+            )
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -1447,6 +1494,15 @@ class BPECausalLMModule(L.LightningModule):
         self.log(f"bpe/{stage}_base_loss", base_loss)
         self.log(f"bpe/{stage}_mtp_loss", mtp_loss)
         self.log(f"bpe/{stage}_stable", torch.tensor(1.0, device=self.device))
+        for metric_name, metric_value in _lm_completion_metrics(logits, targets).items():
+            self.log(
+                f"bpe/{stage}_{metric_name}",
+                metric_value,
+                prog_bar=stage == "val" and metric_name == "token_acc",
+                on_step=False,
+                on_epoch=True,
+                batch_size=targets.numel(),
+            )
         return loss
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -1590,6 +1646,7 @@ def _build_trainer(
         precision=_resolve_precision(config, accelerator),
         log_every_n_steps=int(logging_cfg.get("log_every_n_steps", 10)),
         default_root_dir=str(output_dir),
+        enable_progress_bar=bool(logging_cfg.get("enable_progress_bar", True)),
     )
 
 
@@ -1767,10 +1824,24 @@ def run_feasibility_experiment(
                 raise
         metric = dabe_trainer.callback_metrics.get("dabe/val_loss")
         dabe_val_loss = float(metric.item()) if metric is not None else None
+        dabe_val_token_acc_metric = dabe_trainer.callback_metrics.get("dabe/val_token_acc")
+        dabe_val_top5_metric = dabe_trainer.callback_metrics.get("dabe/val_top5_acc")
+        dabe_val_top10_metric = dabe_trainer.callback_metrics.get("dabe/val_top10_acc")
         dabe_stable = dabe_model.nan_batches == 0
         result["dabe_lm"] = {
             "val_loss": dabe_val_loss,
             "val_perplexity": math.exp(dabe_val_loss) if dabe_val_loss is not None else None,
+            "val_token_acc": (
+                float(dabe_val_token_acc_metric.item())
+                if dabe_val_token_acc_metric is not None
+                else None
+            ),
+            "val_top5_acc": (
+                float(dabe_val_top5_metric.item()) if dabe_val_top5_metric is not None else None
+            ),
+            "val_top10_acc": (
+                float(dabe_val_top10_metric.item()) if dabe_val_top10_metric is not None else None
+            ),
             "stable": dabe_stable,
             "train_samples": len(dabe_data.train_dataset),
             "val_samples": len(dabe_data.val_dataset),
@@ -1891,10 +1962,24 @@ def run_feasibility_experiment(
                 raise
         metric = bpe_trainer.callback_metrics.get("bpe/val_loss")
         bpe_val_loss = float(metric.item()) if metric is not None else None
+        bpe_val_token_acc_metric = bpe_trainer.callback_metrics.get("bpe/val_token_acc")
+        bpe_val_top5_metric = bpe_trainer.callback_metrics.get("bpe/val_top5_acc")
+        bpe_val_top10_metric = bpe_trainer.callback_metrics.get("bpe/val_top10_acc")
         bpe_stable = bpe_model.nan_batches == 0
         result["bpe_baseline"] = {
             "val_loss": bpe_val_loss,
             "val_perplexity": math.exp(bpe_val_loss) if bpe_val_loss is not None else None,
+            "val_token_acc": (
+                float(bpe_val_token_acc_metric.item())
+                if bpe_val_token_acc_metric is not None
+                else None
+            ),
+            "val_top5_acc": (
+                float(bpe_val_top5_metric.item()) if bpe_val_top5_metric is not None else None
+            ),
+            "val_top10_acc": (
+                float(bpe_val_top10_metric.item()) if bpe_val_top10_metric is not None else None
+            ),
             "stable": bpe_stable,
             "train_samples": len(bpe_data.train_dataset),
             "val_samples": len(bpe_data.val_dataset),

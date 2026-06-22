@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="585" viewBox="0 0 920 585">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<style>
+  .title { font-family: Georgia, serif; font-size: 22px; font-weight: 700; fill: #1e2724; }
+  .subtitle { font-family: Georgia, serif; font-size: 13px; fill: #65736f; }
+  .axis { stroke: #1e2724; stroke-width: 1.2; }
+  .grid { stroke: #d8ddd7; stroke-width: 1; }
+  .tick { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #65736f; }
+  .label { font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #1e2724; }
+  .small { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #65736f; }
+</style>
+<text x="70" y="40" class="title">Fig. 7. Sparse repair trace from EXP-094</text>
+<text x="70" y="62" class="subtitle">The gist stream misses local lexical details; sparse repair restores selected tokens in the final decode.</text>
+<text x="70" y="86" class="small">Source: EXP-087 checkpoint diagnostic. Gist acc 0.625 -> final acc 0.984; 23 corrected positions.</text>
+<text x="70" y="118" class="label">pos</text>
+<text x="124" y="118" class="label">target</text>
+<text x="220" y="118" class="label">gist pred</text>
+<text x="362" y="118" class="label">final pred</text>
+<text x="502" y="118" class="label">slot p</text>
+<text x="655" y="118" class="label">outcome</text>
+<text x="778" y="118" class="label">why it matters</text>
+<line x1="70" y1="128" x2="850" y2="128" class="axis"/>
+<rect x="60" y="134" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="156" class="small">0</text>
+<text x="124" y="156" class="small"> like</text>
+<text x="220" y="156" class="small"> really</text>
+<text x="362" y="156" class="small"> like</text>
+<text x="502" y="156" class="small">0.51</text>
+<circle cx="663" cy="152" r="5" fill="#1f6f68"/>
+<text x="675" y="156" class="small">corrected</text>
+<text x="778" y="156" class="small">local syntax</text>
+<rect x="60" y="164" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="186" class="small">5</text>
+<text x="124" y="186" class="small"> just</text>
+<text x="220" y="186" class="small"> never</text>
+<text x="362" y="186" class="small"> just</text>
+<text x="502" y="186" class="small">0.52</text>
+<circle cx="663" cy="182" r="5" fill="#1f6f68"/>
+<text x="675" y="186" class="small">corrected</text>
+<text x="778" y="186" class="small">local syntax</text>
+<rect x="60" y="194" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="216" class="small">15</text>
+<text x="124" y="216" class="small"> covered</text>
+<text x="220" y="216" class="small"> are</text>
+<text x="362" y="216" class="small"> covered</text>
+<text x="502" y="216" class="small">0.62</text>
+<circle cx="663" cy="212" r="5" fill="#1f6f68"/>
+<text x="675" y="216" class="small">corrected</text>
+<text x="778" y="216" class="small">scene state</text>
+<rect x="60" y="224" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="246" class="small">17</text>
+<text x="124" y="246" class="small"> sun</text>
+<text x="220" y="246" class="small"> hole</text>
+<text x="362" y="246" class="small"> sun</text>
+<text x="502" y="246" class="small">0.69</text>
+<circle cx="663" cy="242" r="5" fill="#1f6f68"/>
+<text x="675" y="246" class="small">corrected</text>
+<text x="778" y="246" class="small">scene state</text>
+<rect x="60" y="254" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="276" class="small">21</text>
+<text x="124" y="276" class="small"> sky</text>
+<text x="220" y="276" class="small"> new</text>
+<text x="362" y="276" class="small"> sky</text>
+<text x="502" y="276" class="small">0.50</text>
+<circle cx="663" cy="272" r="5" fill="#1f6f68"/>
+<text x="675" y="276" class="small">corrected</text>
+<text x="778" y="276" class="small">scene state</text>
+<rect x="60" y="284" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="306" class="small">22</text>
+<text x="124" y="306" class="small"> darker</text>
+<text x="220" y="306" class="small"> up</text>
+<text x="362" y="306" class="small"> darker</text>
+<text x="502" y="306" class="small">0.54</text>
+<circle cx="663" cy="302" r="5" fill="#1f6f68"/>
+<text x="675" y="306" class="small">corrected</text>
+<text x="778" y="306" class="small">scene state</text>
+<rect x="60" y="314" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="336" class="small">27</text>
+<text x="124" y="336" class="small">What</text>
+<text x="220" y="336" class="small">Thank</text>
+<text x="362" y="336" class="small">What</text>
+<text x="502" y="336" class="small">0.57</text>
+<circle cx="663" cy="332" r="5" fill="#1f6f68"/>
+<text x="675" y="336" class="small">corrected</text>
+<text x="778" y="336" class="small">entity/dialogue detail</text>
+<rect x="60" y="344" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="366" class="small">30</text>
+<text x="124" y="366" class="small"> cloud</text>
+<text x="220" y="366" class="small"> one</text>
+<text x="362" y="366" class="small"> cloud</text>
+<text x="502" y="366" class="small">0.51</text>
+<circle cx="663" cy="362" r="5" fill="#1f6f68"/>
+<text x="675" y="366" class="small">corrected</text>
+<text x="778" y="366" class="small">entity/dialogue detail</text>
+<rect x="60" y="374" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="396" class="small">53</text>
+<text x="124" y="396" class="small"> strange</text>
+<text x="220" y="396" class="small"> new</text>
+<text x="362" y="396" class="small"> strange</text>
+<text x="502" y="396" class="small">0.65</text>
+<circle cx="663" cy="392" r="5" fill="#1f6f68"/>
+<text x="675" y="396" class="small">corrected</text>
+<text x="778" y="396" class="small">lexical repair</text>
+<rect x="60" y="404" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="426" class="small">54</text>
+<text x="124" y="426" class="small"> cloud</text>
+<text x="220" y="426" class="small"> car</text>
+<text x="362" y="426" class="small"> cloud</text>
+<text x="502" y="426" class="small">0.55</text>
+<circle cx="663" cy="422" r="5" fill="#1f6f68"/>
+<text x="675" y="426" class="small">corrected</text>
+<text x="778" y="426" class="small">entity/dialogue detail</text>
+<rect x="60" y="434" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="456" class="small">60</text>
+<text x="124" y="456" class="small"> monster</text>
+<text x="220" y="456" class="small"> bad</text>
+<text x="362" y="456" class="small"> monster</text>
+<text x="502" y="456" class="small">0.56</text>
+<circle cx="663" cy="452" r="5" fill="#1f6f68"/>
+<text x="675" y="456" class="small">corrected</text>
+<text x="778" y="456" class="small">entity/dialogue detail</text>
+<rect x="60" y="464" width="790" height="30" fill="#fbfaf6" rx="4"/>
+<text x="70" y="486" class="small">61</text>
+<text x="124" y="486" class="small"> cloud</text>
+<text x="220" y="486" class="small"> dragon</text>
+<text x="362" y="486" class="small"> cloud</text>
+<text x="502" y="486" class="small">0.50</text>
+<circle cx="663" cy="482" r="5" fill="#1f6f68"/>
+<text x="675" y="486" class="small">corrected</text>
+<text x="778" y="486" class="small">entity/dialogue detail</text>
+<rect x="60" y="494" width="790" height="30" fill="#f4f1e8" rx="4"/>
+<text x="70" y="516" class="small">63</text>
+<text x="124" y="516" class="small"> Anna</text>
+<text x="220" y="516" class="small"> And</text>
+<text x="362" y="516" class="small"> Anna</text>
+<text x="502" y="516" class="small">0.50</text>
+<circle cx="663" cy="512" r="5" fill="#1f6f68"/>
+<text x="675" y="516" class="small">corrected</text>
+<text x="778" y="516" class="small">entity/dialogue detail</text>
+<text x="70" y="547" class="label">Target:  like nothing. It was just a big, white, fluffy cloud. It covered the sun and made the sky darker.  &quot;What is that cloud, Anna?&quot; Ben asked, feeling sca...</text>
+</svg>

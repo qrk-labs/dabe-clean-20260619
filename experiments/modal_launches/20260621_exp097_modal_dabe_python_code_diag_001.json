@@ -1,0 +1,12 @@
+{
+  "launched_at": "2026-06-21T21:05:27.553232+00:00",
+  "run_id": "exp097_modal_dabe_python_code_diag_001",
+  "app_id": "ap-VlMsWb8t0BSYM39XiIuFCA",
+  "status": "completed",
+  "function": "scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics",
+  "source_run_id": "exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02",
+  "checkpoint_name": "best-step-0012000.ckpt",
+  "dataset_name": "__python_code__",
+  "max_batches": 43,
+  "num_samples": 32
+}

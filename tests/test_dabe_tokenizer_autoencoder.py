@@ -448,6 +448,8 @@ def test_dabe_chunk_tokenizer_gist_residual_variable_windows_shapes_and_gradient
             "hierarchical_refine_layers": 1,
             "variable_window_refine_layers": 1,
             "variable_window_target_mode": "action_value",
+            "variable_window_mixing_mode": "straight_through",
+            "variable_window_temperature": 0.7,
             "lexical_lookup_k": 4,
             "lexical_lookup_heads": 4,
             "lexical_lookup_selector": "learned",
@@ -472,6 +474,10 @@ def test_dabe_chunk_tokenizer_gist_residual_variable_windows_shapes_and_gradient
     assert output.variable_window_target.shape == (4, 4)
     assert output.variable_window_probs is not None
     assert output.variable_window_probs.shape == (4, 4, 3)
+    assert torch.allclose(output.variable_window_probs.sum(dim=-1), torch.ones(4, 4))
+    assert torch.allclose(output.variable_window_probs.max(dim=-1).values, torch.ones(4, 4))
+    assert output.variable_window_soft_probs is not None
+    assert output.variable_window_soft_probs.shape == (4, 4, 3)
     assert output.variable_window_bits_per_chunk is not None
     assert output.variable_window_bits_per_chunk.shape == (4,)
     assert output.variable_window_action_deviation is not None

@@ -1,5 +1,745 @@
 # Experiment Log
 
+## EXP-100: Python-Code Sparse-Repair Reconstruction Smoke
+
+**Date:** 2026-06-21
+**Hypothesis:** If the poor EXP-097 Python-code reconstruction was primarily domain exposure rather than a hard architectural failure, then training the existing `gist_residual_lookup` tokenizer-autoencoder directly on deterministic Python-code text should substantially improve reconstruction token accuracy and reduce chunk deviation relative to the zero-shot Python-code diagnostic. This is a reconstruction/deviation smoke test, not a new architecture and not a broad code benchmark.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal overrides matching the EXP-087 sparse-repair family but with `dataset_name=__python_code__` (commit: `5af8dc8`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- No new architecture; use `decoder_mode=gist_residual_lookup`, learned selector, halting lookup slots, `code_bits=1024`, and 64-token GPT-2 chunks.
+- Train only on deterministic `__python_code__` text with a Modal T4 cap.
+- Log `val_token_acc_last`, `val_chunk_deviation_mean_last`, `val_chunk_deviation_p90_last`, exact chunk/block metrics, observed bits/token, active K, and ETA.
+- Compare against EXP-097 zero-shot Python-code diagnostic and EXP-094 TinyStories sparse-repair diagnostic.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp100_modal_dabe_python_code_reconstruction_001` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | function cap `1800s` |
+| Dataset | deterministic `__python_code__` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| App ID | `ap-J6PPuRANc5EAaPwLDzFBAN` |
+| Launch contract | `experiments/modal_launches/20260621_exp100_modal_dabe_python_code_reconstruction_001.json` |
+| State | completed; `pipeline_summary.status=ok` |
+
+### Results
+| Metric | DABE LM | BPE baseline | Interpretation |
+|--------|--------:|-------------:|----------------|
+| validation loss | `0.02596` | `0.05455` | DABE remains lower on the repeated code pilot |
+| validation perplexity | `1.02630` | `1.05606` | DABE remains lower |
+| next-token accuracy | `0.98964` | `0.98012` | DABE is higher by `0.00953` absolute |
+| top-5 accuracy | `1.0` | `0.99918` | both nearly saturated |
+| top-10 accuracy | `1.0` | `1.0` | saturated on this deterministic corpus |
+| train windows | `3511` | `21941` | BPE creates many more token windows from Python punctuation |
+| val windows | `439` | `2741` | tokenization-length effect repeats in validation |
+| tokens/s | `5254.68` | `5183.32` | roughly matched under concurrent run |
+| GPU peak allocated | `931.16` MiB | `931.16` MiB | shared-process peak; not separable per stage |
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/` |
+| Pipeline summary | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/pipeline_summary.json` |
+| DABE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/dabe_lm_stage_result.json` |
+| BPE stage result | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/bpe_baseline_stage_result.json` |
+| Completion examples | `experiments/modal_downloads/exp099_modal_python_code_completion_metrics_001/completion_examples.json` |
+
+### Key Observations
+- EXP-099 confirms that EXP-098's favorable loss was not hiding poor argmax completion: DABE's next-token completion accuracy is also higher than BPE on this deterministic Python-code pilot.
+- The near-saturated top-k metrics show that this generator is easy after in-domain training; cite it as a controlled domain-adaptation check, not a broad Python benchmark.
+- Chunk deviation remains a tokenizer-autoencoder reconstruction metric, so EXP-100 is running separately for the deviation comparison.
+- The completion example probe shows the qualitative tokenization difference directly: DABE predicts learned code-span tokens such as `add_user(users,` and `users.append({'name':`, while BPE predicts GPT-2 subword pieces such as ` add`, `_`, and `user`.
+
+### Status: [COMPLETE]
+
+## EXP-099: Python-Code Completion Metrics and Reconstruction Comparison
+
+**Date:** 2026-06-21
+**Hypothesis:** EXP-098's favorable Python-code LM loss should translate into measurable next-token completion accuracy for both DABE and BPE on the same deterministic code validation corpus. However, LM completion metrics and tokenizer reconstruction metrics answer different questions: completion accuracy tests code-domain language modeling, while chunk deviation requires the tokenizer-autoencoder diagnostic path. If the completion result holds, DABE should remain competitive with or better than BPE on token/top-k completion while preserving the EXP-098 compression signal; reconstruction deviation should be compared separately against TinyStories diagnostics.
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` with added LM completion metrics (commit: `a80ceb3`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- No new architecture and no downstream LM training beyond the existing EXP-098 feasibility setup.
+- Re-run deterministic `dataset_name=__python_code__` with tokenizer prep, then concurrent DABE LM and BPE LM stages in one Modal T4 container.
+- Enforce the same 40-minute function timeout.
+- Log validation loss, perplexity, `val_token_acc`, `val_top5_acc`, `val_top10_acc`, throughput, memory, and tokenizer compression ratio.
+- Treat chunk deviation as a separate tokenizer-autoencoder diagnostic metric; do not infer deviation from LM loss.
+- Compare the resulting completion metrics against TinyStories reconstruction diagnostics in prose without collapsing the two metric families.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp099_modal_python_code_completion_metrics_001` |
+| Modal function | `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` |
+| GPU | one `T4` |
+| Timeout | `2400s` |
+| Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
+| Dataset | deterministic `__python_code__` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| App ID | `ap-n13I0r0uqgeTM8Jiu8phZO` |
+| Launch contract | `experiments/modal_launches/20260621_exp099_modal_python_code_completion_metrics_001.json` |
+| State | completed; `stage_result.status=ok` |
+
+### Results
+| Metric | Value | Interpretation |
+|--------|------:|----------------|
+| train / val chunks | `11264` / `1408` | deterministic Python-code chunks generated successfully |
+| validation loss | `0.04465` | converged from first validation loss `14.22545` |
+| token_acc | `1.0` | exact token reconstruction on this deterministic code validation generator |
+| token top-5 / top-10 acc | `1.0` / `1.0` | saturated |
+| exact chunk accuracy | `1.0` | every evaluated 64-token chunk reconstructed exactly |
+| exact block accuracy | `1.0` for all four 16-token blocks | no first-block weakness on this generator |
+| chunk deviation mean / p90 | `0.0` / `0.0` | no residual reconstruction errors |
+| observed effective bits/token | `16.20189` | far below the nominal full lookup ceiling because active repair use is low |
+| lookup active K / keep prob | `1.0` / `0.01835` | the model learns that most positions do not need sparse repair |
+
+### Comparison
+| Experiment | Domain / setup | token_acc | chunk deviation mean | chunk deviation p90 | observed bpt |
+|------------|----------------|----------:|---------------------:|--------------------:|-------------:|
+| EXP-094 | TinyStories sparse-repair diagnostic | `0.91549` | `5.40859` | `9.0` | `20.44020` |
+| EXP-097 | zero-shot Python-code diagnostic from TinyStories checkpoint | `0.41761` | `37.27273` | `44.0` | `21.36938` |
+| EXP-100 | Python-code trained sparse-repair smoke | `1.0` | `0.0` | `0.0` | `16.20189` |
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/` |
+| Pipeline summary | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/pipeline_summary.json` |
+| Stage result | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/stage_result.json` |
+| Metrics CSV | `experiments/modal_downloads/exp100_modal_dabe_python_code_reconstruction_001/metrics.csv` |
+
+### Key Observations
+- EXP-100 shows that the sparse-repair tokenizer-autoencoder can reconstruct the deterministic Python-code generator exactly after in-domain training.
+- The result strongly supports the interpretation that EXP-097 was a domain-exposure failure, not evidence that the reconstruction mechanism cannot represent code-like structure.
+- Because the corpus is repeated and deterministic, this should be framed as a sanity check and paper-defense control rather than a broad Python-code benchmark.
+
+### Status: [COMPLETE]
+
+## EXP-098: Python-Code BPE vs DABE Concurrent Training
+
+**Date:** 2026-06-21
+**Hypothesis:** Training both the DABE feasibility LM and the GPT-2 BPE baseline LM on the deterministic Python-code corpus should distinguish whether the out-of-domain weakness in EXP-097 is primarily a missing code-domain training issue rather than a sparse-repair mechanism failure. If DABE benefits from code-domain exposure, its validation loss/perplexity should move closer to the BPE baseline while preserving a favorable compression-ratio signal from the learned tokenizer artifact.
+**Config:** `configs/feasibility_python_code_smoke.yaml`, `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` (commit: `0878aa3`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- Run only the existing feasibility DABE LM and BPE baseline mechanisms; no new architecture.
+- Use deterministic `dataset_name=__python_code__` for tokenizer training and LM training/validation.
+- Train the DABE tokenizer artifact first, then run `dabe_lm` and `bpe_baseline` concurrently inside one Modal T4 container.
+- Enforce a 40-minute function timeout.
+- Save per-stage `stage_result.json`, `config.yaml`, final `pipeline_summary.json`, validation loss/perplexity, stability flags, compression ratio vs BPE, runtime throughput, and memory metrics.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp098_modal_python_code_bpe_dabe_concurrent_001` |
+| Modal function | `scripts/modal_feasibility_smoke.py::run_python_code_dabe_bpe_concurrent` |
+| GPU | one `T4` |
+| Timeout | `2400s` |
+| Execution mode | tokenizer prep, then concurrent `dabe_lm` + `bpe_baseline` |
+| Dataset | deterministic `__python_code__` |
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Attempt 1 app | `ap-5JZPO2rZgMvtE1vPSbblE4` |
+| Attempt 1 state | failed after BPE completed; DABE LM had zero 64-span windows |
+| Attempt 1 decision | lengthen deterministic code samples so DABE span-token windows are non-empty, then relaunch |
+| Attempt 2 app | `ap-DeQJk6bEQci52rfw5XjSh5` |
+| Attempt 2 run ID | `exp098_modal_python_code_bpe_dabe_concurrent_002` |
+| Attempt 2 state | failed after both trainers reached `max_epochs=1`; concurrent Lightning Rich progress-bar teardown raised `IndexError` |
+| Attempt 2 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_002.json` |
+| Attempt 2 decision | disable Lightning progress bars for concurrent same-process training, then relaunch |
+| Attempt 3 app | `ap-cNU0vW9FwELNkH1ap0Bxvu` |
+| Attempt 3 run ID | `exp098_modal_python_code_bpe_dabe_concurrent_003` |
+| Attempt 3 state | completed cleanly |
+| Attempt 3 launch contract | `experiments/modal_launches/20260621_exp098_modal_python_code_bpe_dabe_concurrent_003.json` |
+
+### Results
+| Metric | DABE LM | BPE baseline | Interpretation |
+|--------|--------:|-------------:|----------------|
+| validation loss | `0.01413` | `0.05079` | DABE lower on this deterministic code pilot |
+| validation perplexity | `1.01423` | `1.05211` | DABE lower |
+| stable | `true` | `true` | both runs numerically stable |
+| train windows | `3511` | `21941` | BPE produces many more token windows from punctuation-heavy code |
+| val windows | `439` | `2741` | same tokenization-length effect |
+| steps/s | `16.74` | `10.37` | DABE stage faster per optimizer step |
+| tokens/s | `8569.75` | `5308.30` | DABE higher throughput under this concurrent T4 run |
+| GPU peak allocated | `683.14` MiB | `683.14` MiB | shared-process peak; not separable per stage |
+
+### Tokenizer Result
+| Metric | Value |
+|--------|------:|
+| learned vocab size | `74` |
+| avg tokenizer train loss | `0.71258` |
+| compression ratio vs GPT-2 BPE | `3.66321` |
+| density width_10 | `0.97106` |
+| hamming same mean | `0.60274` |
+| hamming diff mean | `5.65068` |
+
+### Key Observations
+- Attempt 3 completed within the 40-minute cap after disabling Lightning progress bars for same-process concurrent training.
+- The result supports the narrower claim that EXP-097's poor zero-shot code reconstruction was at least partly a missing code-domain training issue.
+- This is still a deterministic repeated-snippet corpus, so it is a mechanism/domain-adaptation pilot rather than evidence of broad Python-code generalization.
+- BPE has many more LM windows because punctuation-heavy Python expands into more GPT-2 token positions; report both losses and window counts when citing this.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/` |
+| Pipeline summary | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/pipeline_summary.json` |
+| DABE stage result | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/dabe_lm_stage_result.json` |
+| BPE stage result | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/bpe_baseline_stage_result.json` |
+| DABE metrics CSV | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/dabe_lm_metrics.csv` |
+| BPE metrics CSV | `experiments/modal_downloads/exp098_modal_python_code_bpe_dabe_concurrent_003/bpe_baseline_metrics.csv` |
+
+### Status: [COMPLETE]
+
+## EXP-097: Zero-Shot Python-Code Diagnostics
+
+**Date:** 2026-06-21
+**Hypothesis:** If the EXP-087 sparse-repair mechanism is not merely exploiting TinyStories regularities, then zero-shot diagnostics on deterministic Python-like code should still expose interpretable repair behavior around syntax-critical or identifier-like tokens, even if aggregate reconstruction quality drops out of domain.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02`, `checkpoint=best-step-0012000.ckpt`, `dataset_name=__python_code__`, `decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, T4 diagnostic probe), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: `bd6bec0`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis), 7 (Limitations)
+
+### Success Criteria
+- Probe-only run; no training and no architecture change.
+- Save token accuracy, chunk deviation, runtime/memory profile, corrected samples, and repair traces.
+- Cover generated Python-code validation chunks up to `max_batches=43`, with `num_samples=32`.
+- Interpret results as out-of-domain diagnostics, not as a broad code benchmark.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp097_modal_dabe_python_code_diag_001` |
+| App ID | `ap-VlMsWb8t0BSYM39XiIuFCA` |
+| Source run | `exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Run state | `stage_result.status=ok`; diagnostics completed |
+
+### Results
+| Metric | Value | Interpretation |
+|--------|------:|----------------|
+| batches / val chunks | `22` / `704` | full deterministic code validation corpus generated by the probe |
+| token_acc | `0.41761` | large zero-shot domain gap relative to TinyStories |
+| token_acc 95% CI | `[0.41307, 0.42217]` | Wilson interval over validation token positions |
+| chunk deviation mean / p90 | `37.27273` / `44.0` | code reconstruction remains poor without code-domain training |
+| chunk deviation mean 95% CI | `[36.98295, 37.56250]` | parametric bootstrap from observed token-error rate |
+| observed effective bits/token | `21.36938` | repair path spends more on out-of-domain code |
+| lookup active K | `16.0` | selector saturates to more repair slots under code-domain stress |
+| exact chunk / block accuracy | `0.0` / `0.0` | no exact local reconstruction on code |
+| diagnostic throughput | `192.60` chunks/s, `12326.61` tokens/s | measured T4 decode probe |
+| CUDA peak allocated / reserved | `2031.74` / `2152.00` MiB | same sparse-repair memory footprint as EXP-094 |
+| corrected samples | `32` | repair traces saved for inspection |
+
+### Key Observations
+- The diagnostic completed successfully despite any Modal UI failure indication: `stage_result.json` records `status=ok`.
+- Zero-shot Python code is not solved by the TinyStories-trained checkpoint. This is a useful paper-defense result because it turns the toy-domain critique into an explicit scope boundary.
+- The model increases repair usage on code (`active K=16.0`), suggesting that the router recognizes out-of-domain difficulty but the learned lexical content is not code-calibrated.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp097_modal_dabe_python_code_diag_001/` |
+| Diagnostics JSON | `experiments/modal_downloads/exp097_modal_dabe_python_code_diag_001/decode_diagnostics.json` |
+| Config | `experiments/modal_downloads/exp097_modal_dabe_python_code_diag_001/config.yaml` |
+| Launch contract | `experiments/modal_launches/20260621_exp097_modal_dabe_python_code_diag_001.json` |
+
+### Decisions
+- [x] Use this as a scope/diagnostic result, not as a claim that DABE transfers zero-shot to code.
+- [x] Do not launch broader-prose diagnostics until the paper-defense budget is reviewed.
+
+### Status: [COMPLETE]
+
+## EXP-096: Fixed-Rate Inference Benchmark
+
+**Date:** 2026-06-21
+**Hypothesis:** A probe-only decode diagnostic on EXP-093 will measure the fixed-rate no-lookup inference throughput and memory under the same diagnostic path used for EXP-094, providing a fair overhead comparison for sparse repair.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides (`source_run_id=exp093_modal_dabe_fixed_rate_20bpt_001`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=hierarchical_local`, `code_bits=1280`, TinyStories `4096/512`, T4 diagnostic probe), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: `bd6bec0`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 6 (Analysis)
+
+### Success Criteria
+- Probe-only run; no training.
+- Full validation cap (`max_batches=43`) if cheap.
+- Save diagnostic wall seconds, chunks/s, tokens/s, CUDA peak allocated/reserved, token accuracy, and chunk deviation.
+- Compare directly with EXP-094 sparse-repair diagnostic throughput/memory.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp096_modal_dabe_fixed20_inference_diag_001` |
+| App ID | `ap-P42VAGtWk5L9w9m2Gp11RD` |
+| Source run | `exp093_modal_dabe_fixed_rate_20bpt_001` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Run state | `stage_result.status=ok`; diagnostics completed |
+
+### Results
+| Metric | EXP-096 fixed no-lookup | EXP-094 sparse repair | Interpretation |
+|--------|------------------------:|----------------------:|----------------|
+| batches / val chunks | `43` / `1351` | `43` / `1351` | matched validation probe |
+| token_acc | `0.72025` | `0.91549` | sparse repair is much more accurate |
+| token_acc 95% CI | `[0.71725, 0.72324]` | `[0.91362, 0.91733]` | non-overlapping diagnostic intervals |
+| chunk deviation mean | `17.90377` | `5.40859` | sparse repair reduces distortion sharply |
+| chunk deviation mean 95% CI | `[17.71429, 18.09474]` | `[5.29016, 5.52630]` | parametric bootstrap intervals |
+| observed effective bits/token | `20.0` | `20.44020` diagnostic accounting | same decode path, sparse repair spends active slots |
+| diagnostic throughput | `514.54` chunks/s, `32930.44` tokens/s | `210.33` chunks/s, `13461.43` tokens/s | sparse repair is `2.45x` slower at inference |
+| CUDA peak allocated / reserved | `852.80` / `974.00` MiB | `2031.74` / `2152.00` MiB | sparse repair uses `2.38x` allocated memory |
+
+### Key Observations
+- The diagnostic completed successfully despite any Modal UI failure indication: `stage_result.json` records `status=ok`.
+- The inference overhead headline is clear: sparse repair buys a large quality gain at roughly `2.45x` slower decode throughput and `2.38x` higher peak allocated memory on this T4 probe.
+- This is a measured inference/probe cost, separate from the training ETA estimate (`~1.8x` slower for sparse repair vs fixed-rate).
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp096_modal_dabe_fixed20_inference_diag_001/` |
+| Diagnostics JSON | `experiments/modal_downloads/exp096_modal_dabe_fixed20_inference_diag_001/decode_diagnostics.json` |
+| Config | `experiments/modal_downloads/exp096_modal_dabe_fixed20_inference_diag_001/config.yaml` |
+| Launch contract | `experiments/modal_launches/20260621_exp096_modal_dabe_fixed20_inference_diag_001.json` |
+
+### Decisions
+- [x] Use EXP-096 as the matched fixed-rate inference benchmark for the runtime/overhead critique.
+- [x] Do not relaunch; the artifact is complete and usable.
+
+### Status: [COMPLETE]
+
+## EXP-095: Longer Fixed-Rate 20bpt Baseline
+
+**Date:** 2026-06-21
+**Hypothesis:** EXP-093 may understate the fixed-rate no-lookup baseline if the `1280`-bit hierarchical-local decoder needs more optimization time. Extending the matched baseline to `24000` steps tests whether convergence closes the gap to sparse repair, without changing architecture or bitrate.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal train overrides (`decoder_mode=hierarchical_local`, `code_bits=1280`, `chunk_size_tokens=64`, TinyStories `4096/512`, `batch_size=32`, `bf16-mixed`, `val_check_interval=300`, `checkpoint_every_n_train_steps=2000`, `max_steps=24000`, T4), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` (commit: `bd6bec0`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Same architecture and data basis as EXP-093.
+- Log token accuracy, chunk deviation mean/p90, bit density, exact block/chunk metrics, and ETA.
+- Stop early only if clearly plateaued after at least 12000 steps; otherwise let the 24000-step run finish or hit the existing function cap.
+- Use result only as a convergence defense for the fixed-rate comparator.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp095_modal_dabe_fixed_rate_20bpt_24k_001` |
+| App ID | `ap-GrR4HQn2oX7B2CobICAEW0` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Max steps | `24000` |
+| Timeout | existing `1800s` function cap |
+| Run state | timed out near `23500/24000`; `metrics.csv` and best checkpoint were written |
+
+### Results
+| Metric | EXP-093 12k fixed-rate | EXP-095 longer fixed-rate best | EXP-092 sparse repair | Interpretation |
+|--------|-----------------------:|-------------------------------:|----------------------:|----------------|
+| effective/observed bits/token | `20.0` | `20.0` | `20.06207` | matched bitrate scale |
+| best validation step | `12000` horizon | `22185` | `12000` horizon | EXP-095 tests undertraining critique |
+| token_acc | `0.72045` | `0.77324` | `0.89274` | longer training helps but does not close the gap |
+| token_top5_acc | `0.85671` | `0.89477` | N/A | fixed baseline improves with more steps |
+| token_top10_acc | `0.89064` | `0.92311` | N/A | fixed baseline improves with more steps |
+| chunk deviation mean | `17.89119` | `14.51295` | `6.86454` | sparse repair remains `7.65` tokens/chunk better than longer fixed baseline |
+| chunk deviation p90 | `24.14597` | `20.75514` | `10.96876` | tail distortion remains much worse for fixed-rate |
+| exact 16-token block avg | `0.05774` | `0.07754` | N/A | exact local reconstruction improves only modestly |
+| exact 64-token chunk acc | `0.0` | `0.0` | N/A | no full-chunk exact reconstruction |
+| bit density | `0.48766` | `0.48892` | N/A | non-collapsed code remains healthy |
+
+### Key Observations
+- EXP-095 answers the convergence critique directly: EXP-093 was somewhat undertrained, but longer fixed-rate training still leaves a large mechanism gap.
+- Best validation occurred at step `22185` with token accuracy `0.77324`; the final validation before timeout at step `23244` was similar (`0.77111`), indicating a local plateau.
+- Compared with EXP-092, the longer fixed-rate baseline remains `0.11950` absolute token accuracy lower and `7.64841` tokens/chunk worse in mean deviation at the same bitrate scale.
+- The timeout is operational rather than scientific: the run passed the required `12000`-step minimum, wrote `metrics.csv`, and saved a remote best checkpoint.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp095_modal_dabe_fixed_rate_20bpt_24k_001/` |
+| Metrics CSV | `experiments/modal_downloads/exp095_modal_dabe_fixed_rate_20bpt_24k_001/metrics.csv` |
+| Config | `experiments/modal_downloads/exp095_modal_dabe_fixed_rate_20bpt_24k_001/config.yaml` |
+| Remote best checkpoint | `/experiments/exp095_modal_dabe_fixed_rate_20bpt_24k_001/checkpoints/best-step-0022000.ckpt` |
+| Launch contract | `experiments/modal_launches/20260621_exp095_modal_dabe_fixed_rate_20bpt_24k_001.json` |
+
+### Decisions
+- [x] Treat EXP-095 as a convergence-defense result, not as a new baseline architecture.
+- [x] Do not spend budget relaunching to recover the last ~500 steps; the defense question is already answered.
+- [x] Update the paper to report both the original matched 12k comparator and the longer fixed-rate convergence check.
+
+### Status: [COMPLETE]
+
+## EXP-094: Repair Trace Diagnostics on Quality Anchor
+
+**Date:** 2026-06-19
+**Hypothesis:** Running the enhanced decode diagnostic on EXP-087's quality-anchor checkpoint will produce paper-usable examples where the gist stream misses local lexical details and sparse repair corrects them. These examples should make the repair mechanism inspectable without relying on older EXP-078 diagnostics.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + Modal probe overrides matching EXP-087 lead child (`source_run_id=exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02`, `checkpoint=best-step-0012000.ckpt`, `decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, TinyStories `4096/512`, T4 diagnostic probe), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` (commit: `f91cf48daf49e92dcc9b3b8a4b665f84b91070f3` + working-tree diagnostic trace instrumentation)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Probe evaluates EXP-087's saved best checkpoint directly with no additional training.
+- Run is a short diagnostic burst intended to finish within about 10 minutes.
+- Save aggregate decode metrics, diagnostic tokens/s, CUDA peak memory, and top corrected chunks.
+- `corrected_samples` includes target text, gist prediction, final repaired text, lookup positions, keep probabilities, and per-token repair outcomes.
+- Pull lightweight JSON artifacts and update the sparse-repair trace figure if examples are cleaner than EXP-078.
+
+### Planned Launch
+| Field | Value |
+|-------|-------|
+| Run ID | `exp094_modal_dabe_repair_trace_diag_001` |
+| Source run | `exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02` |
+| Checkpoint | `best-step-0012000.ckpt` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics` |
+| GPU | one `T4` |
+| Probe budget | full validation cap (`max_batches=43`) with `num_samples=64` corrected examples |
+
+### Decisions
+- [x] Use EXP-087 rather than EXP-078 because EXP-087 is the paper quality anchor.
+- [x] Keep this as a diagnostic/probe run, not additional training.
+- [x] Launch detached Modal probe and capture app ID.
+- [x] Pull lightweight artifacts and summarize corrected examples.
+- [x] Update sparse-repair trace figure from EXP-094.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| First app | `ap-QFydPdF0hTfYh4XDvboIHa` failed during strict checkpoint load |
+| Successful app | `ap-4oa8OgANjvDRfj5ap9I7NL` |
+| Launch contracts | `experiments/modal_launches/20260619_235900_exp094_modal_dabe_repair_trace_diag_001_attempt1_failed.json`, `experiments/modal_launches/20260619_235940_exp094_modal_dabe_repair_trace_diag_001.json` |
+| Run state | completed cleanly after diagnostic loader switched to `strict=False` |
+
+### Results
+| Metric | Value | Interpretation |
+|--------|------:|----------------|
+| batches / val chunks | `43` / `1351` | full validation diagnostic |
+| token_acc | `0.91549` | matches EXP-087 quality-anchor callback |
+| gist_token_acc | `0.67262` | gist alone is much weaker than repaired decode |
+| chunk deviation mean / p90 | `5.40859` / `9.0` | confirms EXP-087 distortion profile |
+| observed effective bits/token | `20.44020` | diagnostic recomputation with current budget accounting |
+| lookup budget K / active K | `12.91695` / `9.37232` | sparse repair remains selective |
+| repair correction fraction | `0.76296` | most gist errors corrected by final decode |
+| repair damage fraction | `0.00690` | repair rarely harms gist-correct tokens |
+| diagnostic throughput | `210.33` chunks/s, `13461.43` tokens/s | measured decode pass on T4 |
+| CUDA peak allocated / reserved | `2031.74` / `2152.00` MiB | measured diagnostic memory |
+
+### Key Observations
+- The best paper-facing corrected example has gist token accuracy `0.625`, final token accuracy `0.984375`, `23` corrected positions, and only one remaining token error.
+- Concrete repairs include `really -> like`, `never -> just`, `hole -> sun`, `new -> sky`, `bad -> monster`, `dragon -> cloud`, and `And -> Anna`.
+- The figure pipeline now uses this EXP-094 trace instead of the older EXP-078 diagnostic, which makes the internal decision-making substantially clearer.
+
+### Artifacts
+| Artifact | Path |
+|----------|------|
+| Local download | `experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/` |
+| Diagnostics JSON | `experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/decode_diagnostics.json` |
+| Repair figure data | `research/paper_drafts/figures/repair_trace_data.json` |
+
+### Status: [COMPLETE]
+
+## EXP-093: Fixed-Rate 20bpt No-Lookup Baseline
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-092 identified a cost-aware sparse-repair operating point at `20.06207` observed bits/token, but the paper needs a directly comparable standard learned-tokenizer baseline at the same bitrate. A `1280`-bit hierarchical-local no-lookup tokenizer (`1280 / 64 = 20.0` bits/token) should test whether DABE's gain comes from adaptive lexical repair rather than simply spending about `20` bits/token on a fixed-rate learned chunk code.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal overrides (`decoder_mode=hierarchical_local`, `code_bits=1280`, `hierarchical_block_tokens=16`, no sparse lookup path, TinyStories `4096/512`, `max_steps=12000`, `val_check_interval=300`, `checkpoint_every_n_train_steps=2000`, `batch_size=32`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` (commit: `034bdcd04b7e3d6ebe6cd1f23d1129306abf16f1`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Experimental Setup), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run one sequential/single T4 job; no sweep and no new implementation surface.
+- Complete within the existing `1800s` function timeout or at least write usable checkpoint/metrics artifacts.
+- Match EXP-092's bitrate scale with a fixed-rate no-lookup baseline (`20.0` bits/token vs `20.06207` observed bits/token).
+- Log token accuracy, top-k accuracy, exact chunk/block metrics, bit density, and best checkpoint.
+- Paper-critical comparison: if quality remains near EXP-071/079 no-lookup baselines and below EXP-092/087, this strengthens the claim that sparse lexical repair is not just extra bitrate.
+
+### Decisions
+- [x] Use `hierarchical_local` as the standard fixed-rate learned chunk tokenizer comparator.
+- [x] Keep dataset, batch size, steps, and validation cadence aligned with EXP-092 for attribution.
+- [x] Launch Modal run and capture launch contract.
+- [x] Pull lightweight artifacts and update paper results table.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp093_modal_dabe_fixed_rate_20bpt_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-oNvKTYt6qZwGCQF2DvxdXo` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_211038_exp093_modal_dabe_fixed_rate_20bpt_001.json` |
+| Early status | Reached `[eta] step=5500/12000 sps=14.34 eta_min=7.6` before detaching local log stream |
+
+### Results
+| Metric | EXP-093 Value | EXP-092 `0.025` | Interpretation |
+|--------|---------------|-----------------|----------------|
+| run state | complete; `nan_batches=0`, `stable=true` | complete | pass |
+| decoder mode | `hierarchical_local` | `gist_residual_lookup` | fixed-rate no-lookup vs adaptive repair |
+| effective / observed bits/token | `20.0` | `20.06207` | matched bitrate |
+| token_acc | `0.72045` | `0.89274` | adaptive repair `+0.17229` absolute |
+| token_top5_acc | `0.85671` | N/A | no-lookup context |
+| token_top10_acc | `0.89064` | N/A | no-lookup context |
+| chunk deviation mean | `17.89119` | `6.86454` | adaptive repair much lower distortion |
+| chunk deviation p90 | `24.14597` | `10.96876` | adaptive repair much lower tail distortion |
+| exact_16token_block_avg | `0.05774` | N/A | no-lookup local exact reconstruction remains weak |
+| exact_64token_chunk_acc | `0.0` | N/A | no full-chunk exact reconstruction |
+| bit density | `0.48766` | N/A | non-collapsed fixed-rate code |
+| best checkpoint | `best-step-0012000.ckpt` | `best-step-0012000.ckpt` | comparable training horizon |
+
+### Exact Block Accuracy
+| Block | Exact acc | Token acc |
+|-------|-----------|-----------|
+| block 0 | `0.20799` | `0.77813` |
+| block 1 | `0.01258` | `0.71327` |
+| block 2 | `0.00444` | `0.69495` |
+| block 3 | `0.00592` | `0.69546` |
+
+### Key Observations
+- EXP-093 is the matched fixed-rate comparator the paper needed: `20.0` bits/token with no sparse lookup path.
+- The no-lookup fixed-rate code is stable and non-collapsed (`bit_density=0.48766`), but reconstruction remains far below the adaptive repair model.
+- At essentially matched bitrate, EXP-092's cost-aware DABE point improves token accuracy by `+0.17229` absolute and reduces mean chunk deviation by `11.02665`.
+- The result strongly supports the paper claim that the gain comes from sparse lexical repair and residual routing, not simply from spending about `20` bits/token.
+- The fixed-rate baseline still shows the familiar first-block dominance: block 0 exact accuracy is `0.20799`, while blocks 1-3 are near zero.
+
+### Decisions
+- [x] Use EXP-093 as the standard fixed-rate learned-tokenizer comparator in the main paper table.
+- [x] Treat EXP-092 `0.025` vs EXP-093 as the cleanest matched-bitrate evidence for adaptive sparse repair.
+- [x] Freeze training experiments unless a reviewer-critical analysis gap appears.
+
+### Status: [COMPLETE]
+
+## EXP-092: Cost-Knee Replication Sweep
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-091 suggests `lookup_slot_cost_weight=0.025` is a local rate-distortion knee: weaker pressure (`0.02`) spends more lookup slots without improving quality, while stronger pressure (`0.03`) lowers bitrate but starts to over-prune. A narrower sequential replication around the knee (`0.0225`, `0.025`, `0.0275`) should show whether the sweet spot is stable enough to use as the paper's cost-aware operating point.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.0225,0.025,0.0275}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: `fbf7b46a662b91ff9b70816df52192df8ca65256`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run all three cost variants sequentially in one T4 Modal app/container; do not introduce a new parallel runtime implementation.
+- Confirm whether `0.025` remains the best quality/cost knee when compared with adjacent costs.
+- Preferred confirmation: `0.025` has the lowest or near-lowest chunk deviation with observed bits/token near or below `20.1`.
+- Stay within the existing `9000s` parent timeout and roughly `$2` compute budget.
+- Preserve reproducibility with launch contract, commit hash, and final lightweight artifacts.
+
+### Decisions
+- [x] Spend compute on a narrow replication rather than a new architecture detour.
+- [x] Keep the sweep sequential to avoid implementation risk while budget is tight.
+- [x] Pull lightweight artifacts and compare against EXP-091 and EXP-087.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp092_modal_dabe_cost_knee_repl_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-qKUcNh9KiLENQDiXD0Pk2G` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `9000s` parent function cap |
+| Launch contract | `experiments/modal_launches/20260619_152844_exp092_modal_dabe_cost_knee_repl_001.json` |
+| Router weights | `0.2` |
+| Slot cost weights | `0.0225`, `0.025`, `0.0275` |
+| Early status | First child reached `[eta] step=300/12000 sps=7.80 eta_min=25.0` before detaching local log stream |
+
+### Results
+| Slot cost | Status | token_acc | chunk deviation mean | chunk deviation p90 | observed bits/token | active K | keep prob | Best checkpoint |
+|-----------|--------|-----------|----------------------|---------------------|---------------------|----------|-----------|-----------------|
+| `0.0225` | complete | `0.89255` | `6.87713` | `11.14981` | `20.26545` | `8.10659` | `0.38777` | `best-step-0012000.ckpt` |
+| `0.025` | complete | `0.89274` | `6.86454` | `10.96876` | `20.06207` | `6.63953` | `0.36928` | `best-step-0012000.ckpt` |
+| `0.0275` | complete | `0.89002` | `7.03849` | `11.12805` | `19.84857` | `4.54922` | `0.34987` | `best-step-0012000.ckpt` |
+
+### Key Observations
+- The replication supports `lookup_slot_cost_weight=0.025` as the local cost-aware knee: it has the best token accuracy, mean chunk deviation, and p90 chunk deviation among the adjacent settings.
+- Increasing the slot cost to `0.0275` continues to reduce observed bitrate (`19.84857` bits/token) and active K (`4.54922`), but reconstruction quality diminishes.
+- Reducing the slot cost to `0.0225` spends more active lookup slots (`8.10659`) and bitrate (`20.26545`) without improving quality over `0.025`.
+- The `0.025` results exactly match EXP-091's `0.025` final metrics, suggesting the apparent knee is stable under the repeated sweep path.
+- EXP-087 remains the quality anchor (`0.91547` token accuracy, `5.41007` mean chunk deviation), while `0.025` is the cost-aware operating point around `20.06` observed bits/token.
+
+### Decisions
+- [x] Use `lookup_slot_cost_weight=0.025` as the paper's cost-aware knee unless a final fixed-rate baseline changes the framing.
+- [x] Treat `0.0275`/`0.03` as lower-bitrate ablation points rather than preferred settings.
+- [ ] If compute permits, run one no-lookup fixed-rate baseline near `20` bits/token to strengthen the standard-comparator table.
+
+### Status: [COMPLETE]
+
+## EXP-091: Cost-Aware Gist-Residual Lookup Sweep
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-087 showed that the fixed-window `gist_residual_lookup` architecture is the strongest current rate-distortion anchor, and EXP-088/089/090 showed that variable token windows are not the right compression lever. The next step is to make EXP-087 more cost-aware by holding the improved residual router fixed (`residual_router_loss_weight=0.2`) and testing gentler lookup slot cost pressure (`0.02`, `0.025`, `0.03`) rather than the blunt `0.04` setting that over-pruned active lookup slots. A mild cost increase should reduce observed bits/token while preserving most of EXP-087's reconstruction quality.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned Modal sweep overrides (`decoder_mode=gist_residual_lookup`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight in {0.02,0.025,0.03}`, `gist_loss_weight=0.25`, TinyStories `4096/512`, `max_steps=12000`, T4, `bf16-mixed`), `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` (commit: `e0696a5062f7f78b1959a4ea740b8dfcd4277fee`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Run all three cost variants sequentially in one T4 Modal app/container.
+- Preserve EXP-087 router quality by keeping `residual_router_loss_weight=0.2`.
+- Find a lower-bitrate operating point than EXP-087 best (`20.37236` observed bits/token) without falling near the over-pruned `0.04` quality regime (`~0.895` token accuracy, `~6.72` mean chunk deviation).
+- Preferred target: observed bits/token below `20.1`, token accuracy above `0.91`, and chunk deviation mean below `5.7`.
+- Log soft K, threshold-active K, lookup keep probability, residual-router metrics, lookup/non-lookup token accuracy, and chunk deviation distribution.
+
+### Decisions
+- [x] Return to EXP-087 fixed 64-token chunk + gist-residual sparse lookup architecture.
+- [x] Treat cost-awareness as gentler learned slot-cost pressure before adding new target-K mechanics.
+- [x] Launch Modal sweep after recording the hypothesis.
+- [x] Pull lightweight artifacts and compare against EXP-087.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Parent run ID | `exp091_modal_dabe_cost_aware_gist_residual_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-T2VMgOnyc8FLd1y7CcYgPo` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_gist_residual_sweep` |
+| GPU | one `T4`, sequential children in the same app/container |
+| Timeout | `9000s` parent function cap |
+| Launch contract | `experiments/modal_launches/20260619_123643_exp091_modal_dabe_cost_aware_gist_residual_001.json` |
+| Router weights | `0.2` |
+| Slot cost weights | `0.02`, `0.025`, `0.03` |
+| Early status | First child reached `[eta] step=600/12000 sps=8.47 eta_min=22.4` before detaching local log stream |
+
+### Results
+| Slot cost | Status | token_acc | chunk deviation mean | chunk deviation p90 | observed bits/token | active K | keep prob | Best checkpoint |
+|-----------|--------|-----------|----------------------|---------------------|---------------------|----------|-----------|-----------------|
+| `0.02` | complete | `0.88896` | `7.10659` | `11.43123` | `20.45823` | `9.49445` | `0.40529` | `best-step-0012000-v1.ckpt` |
+| `0.025` | complete | `0.89274` | `6.86454` | `10.96876` | `20.06207` | `6.63953` | `0.36928` | `best-step-0012000-v1.ckpt` |
+| `0.03` | complete | `0.89080` | `6.98890` | `11.26306` | `19.85791` | `5.22132` | `0.35072` | `best-step-0012000.ckpt` |
+
+### Key Observations
+- The parent sweep completed and wrote both `stage_result.json` and `pipeline_summary.json` under `experiments/exp091_modal_dabe_cost_aware_gist_residual_001`.
+- Modal/Lightning produced two logger versions per variant (`version_0`, `version_1`) and `-v1` checkpoint siblings, which made the live logs look like six runs; the actual config grid remained three variants (`1` router weight x `3` slot costs).
+- Increasing slot-cost pressure reduced active lookup usage and observed bitrate, with `0.03` reaching the lowest observed bits/token (`19.85791`) and active K (`5.22132`).
+- None of the cost-aware variants preserved EXP-087's best reconstruction quality (`0.91547` token accuracy, `5.41007` mean chunk deviation), so the result is a useful rate-reduction ablation rather than a new quality anchor.
+
+### Decisions
+- [x] Treat `lookup_slot_cost_weight=0.025` and `0.03` as lower-bitrate operating points for the rate-distortion curve.
+- [x] Keep EXP-087 as the reconstruction-quality anchor.
+- [ ] Next architectural step should improve router/lookup accuracy at fixed or lower active K rather than simply increasing slot-cost pressure.
+
+### Status: [COMPLETE]
+
+## Cross-Experiment Note: Variable Windows As A Negative Result
+
+**Date:** 2026-06-19
+**Experiments:** EXP-088, EXP-089, EXP-090
+**Paper Section:** 5 (Results), 6 (Analysis)
+
+### Reviewer Question
+Would a sliding-window or variable-token-window tokenizer have worked better than the fixed-window gist-residual lookup model?
+
+### Short Answer
+Not in the tested forms. EXP-088/089/090 should be preserved as an explicit negative-result ablation: adaptive token-window geometry either reduced bitrate at substantial reconstruction cost or collapsed to all-fine routing. The stronger conclusion is that DABE should keep stable fixed chunks and adapt the attention/repair budget over those chunks.
+
+### Evidence Summary
+| Experiment | Mechanism | token_acc | chunk deviation mean | observed bits/token | Conclusion |
+|------------|-----------|-----------|----------------------|---------------------|------------|
+| EXP-087 | fixed chunk + gist-residual sparse lookup | `0.91547` | `5.41007` | `20.37236` | anchor/best |
+| EXP-088 | quantile-supervised variable windows | `0.85820` | `9.07550` | `19.46092` | lower bitrate, quality collapse |
+| EXP-089 | action-value variable windows | `0.87508` | `7.99482` | `18.29175` | best variable-window result, still behind EXP-087 |
+| EXP-090 | straight-through hard variable windows | `0.87209` | `8.18653` | `21.70567` | hard routing collapsed to all-fine |
+
+### Paper Use
+- [x] Preserve the data as a preemptive answer to "why not sliding windows?"
+- [x] Add paper-facing analysis note at `research/paper_drafts/06_analysis.md`.
+- [ ] When drafting results, frame this as "adaptive repair budget beats adaptive token-window geometry" rather than as a failed side quest.
+
+## EXP-090: Hard Straight-Through Variable Window Router
+
+**Date:** 2026-06-19
+**Hypothesis:** EXP-089 showed that action-value supervision is useful, but the decode path still mixed fine/medium/full candidates softly while the router argmax nearly always selected fine windows. If we keep the EXP-089 action-value teacher and replace soft decode mixing with straight-through one-hot routing, the model should reduce the soft/argmax mismatch, make reported variable-window bitrate reflect the actual decoded route, and improve chunk deviation relative to EXP-089 without erasing the bitrate gain over EXP-087.
+**Config:** `configs/dabe_tokenizer_autoencoder_smoke.yaml` + planned overrides (`decoder_mode=gist_residual_variable_windows`, `variable_window_target_mode=action_value`, `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, `code_bits=1024`, `hierarchical_block_tokens=16`, `lexical_lookup_selector=learned`, `lexical_lookup_k=32`, `lexical_lookup_slot_policy=halting`, `gist_loss_weight=0.25`, `residual_router_loss_weight=0.2`, `lookup_slot_cost_weight=0.02`, `variable_window_loss_weight=0.1`, `variable_window_nonimprove_weight=0.1`, TinyStories `4096/512`, `max_steps=10000`, T4, `bf16-mixed`), `src/training/dabe_tokenizer_autoencoder.py` straight-through variable-window router (commit: `15c7f58783c2bb538fe2291d26252ec6580cf14a`)
+**WandB:** N/A (Modal volume artifacts under `dabe-experiments`)
+**Paper Section:** 4 (Architecture), 5 (Results), 6 (Analysis)
+
+### Success Criteria
+- Add a backward-compatible `variable_window_mixing_mode` with `soft`, `straight_through`, and `hard` options.
+- Straight-through mode must decode with one-hot window choices while preserving gradients through soft probabilities.
+- Log soft expected tokens and soft entropy separately from hard route expected tokens.
+- Local compile checks pass before launch.
+- Modal pilot finishes or at least reaches final validation under the 30-minute T4 timeout by using `max_steps=10000`.
+- Improve over EXP-089 on chunk deviation mean (`7.99482`) and/or token accuracy (`0.87508`) while tracking whether observed bitrate stays below EXP-087 (`20.37236`).
+
+### Decisions
+- [x] Keep EXP-089 action-value target and non-improvement penalty.
+- [x] Use straight-through hard window selection instead of soft candidate mixing.
+- [x] Cap pilot at `10000` steps to fit the T4 timeout.
+- [x] Implement model, metrics, and tests.
+- [x] Pass Python compile checks for model, runner, and tests.
+- [x] Launch Modal pilot after local validation.
+
+### Launch Details
+| Field | Value |
+|-------|-------|
+| Run ID | `exp090_modal_dabe_straight_through_window_router_001` |
+| Modal profile | `qrk-labs` |
+| App ID | `ap-npnr4V62u6CdJ9tddNDCDn` |
+| Modal function | `scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_autoencoder` |
+| GPU | one `T4` |
+| Timeout | `1800s` |
+| Launch contract | `experiments/modal_launches/20260619_110400_exp090_modal_dabe_straight_through_window_router_001.json` |
+| Overrides | EXP-089 lead settings plus `variable_window_mixing_mode=straight_through`, `variable_window_temperature=0.7`, and `max_steps=10000` |
+| Early status | Trainer startup completed; observed `[eta] step=300/10000 sps=6.30 eta_min=25.7` before detaching local log stream |
+
+### Results
+Run completed successfully and wrote `stage_result.json`/`pipeline_summary.json`. Lightweight artifacts were pulled to `experiments/modal_downloads/exp090_modal_dabe_straight_through_window_router_001/`; local checkpoint copies were removed after confirming the remote Modal volume still has `last.ckpt` and `best-step-0010000.ckpt`.
+
+| Metric | EXP-090 hard ST windows | EXP-089 soft action-value | EXP-088 quantile windows | EXP-087 best | Delta vs EXP-089 |
+|--------|--------------------------|---------------------------|--------------------------|--------------|------------------|
+| run completion | complete | timeout before summary JSON | timeout before summary JSON | complete | improved |
+| last validation step | `9830` | `9830` | `11242` | `12000` | same |
+| observed effective bits/token | `21.70567` | `18.29175` | `19.46092` | `20.37236` | `+3.41392` |
+| variable-window code bits/chunk | `1024.00000` | `822.16589` | `910.26971` | N/A | `+201.83411` |
+| mean soft lookup K | `16.59831` | `15.84117` | `15.23769` | `12.71961` | `+0.75714` |
+| mean threshold-active K | `17.92968` | `16.42043` | `14.64619` | `9.03257` | `+1.50925` |
+| token_acc | `0.87209` | `0.87508` | `0.85820` | `0.91547` | `-0.00300` |
+| token_top5_acc | `0.97708` | `0.97941` | `0.97430` | `0.98558` | `-0.00234` |
+| token_top10_acc | `0.98368` | `0.98577` | `0.98308` | `0.98989` | `-0.00209` |
+| exact chunk accuracy | `0.00074` | `0.00222` | `0.00074` | `0.02221` | `-0.00148` |
+| chunk deviation mean | `8.18653` | `7.99482` | `9.07550` | `5.41007` | `+0.19171` |
+| chunk deviation p90 | `12.83272` | `12.47994` | `14.07357` | `9.04678` | `+0.35278` |
+| chunk deviation p95 | `14.18875` | `13.86432` | `15.70592` | `10.25307` | `+0.32443` |
+| variable-window acc | `0.84141` | `0.71336` | `0.25000` | N/A | `+0.12805` |
+| predicted fine/medium/full | `1.00000 / 0.00000 / 0.00000` | `0.99944 / 0.00056 / 0.00000` | `1.00000 / 0.00000 / 0.00000` | N/A | harder fine collapse |
+| target fine/medium/full | `0.84141 / 0.13120 / 0.02739` | `0.71318 / 0.23001 / 0.05681` | `0.25000 / 0.25019 / 0.49981` | N/A | teacher shifted further toward fine |
+| hard expected window tokens | `16.00000` | `24.34731` | N/A | N/A | hard all-fine |
+| soft expected window tokens | `17.91449` | N/A | N/A | N/A | new metric |
+| soft entropy | `0.34927` | N/A | N/A | N/A | new metric |
+| variable-window base deviation | `9.93967` | `10.13749` | N/A | N/A | `-0.19782` |
+| variable-window oracle deviation | `5.69319` | `5.64175` | N/A | N/A | `+0.05144` |
+| variable-window chosen deviation | `5.88657` | `6.04534` | N/A | N/A | `-0.15877` |
+| variable-window regret | `0.19338` | `0.40359` | N/A | N/A | `-0.21021` |
+| variable-window non-improve rate | `0.03183` | `0.03294` | N/A | N/A | `-0.00111` |
+
+### Key Observations
+- The 10k-step cap solved the operational problem: EXP-090 completed under the `1800s` Modal timeout and wrote final summaries.
+- Straight-through routing reduced action regret (`0.19338` vs `0.40359`) and made chosen candidate deviation better (`5.88657` vs `6.04534`), so the router/action coupling improved locally.
+- The global reconstruction metric got slightly worse than EXP-089: token accuracy fell to `0.87209` and chunk deviation rose to `8.18653`.
+- The bitrate/compression story worsened sharply. Hard one-hot routing collapsed to all-fine, forcing `1024` variable-window code bits/chunk and `21.70567` observed bits/token, above EXP-087's `20.37236`.
+- This suggests the soft mixture in EXP-089 was functioning as a useful relaxed ensemble/compression proxy, not merely a bug. Hard routing needs an explicit bitrate/action-cost term or a budgeted target; otherwise the action-value teacher naturally prefers fine windows.
+
+### Decisions
+- [x] Treat EXP-090 as a completed negative/mixed result.
+- [x] Keep the implementation available because the hard/soft diagnostic split is useful.
+- [ ] Next run should not use unconstrained hard routing. Try action-value targets with a cost-aware oracle (`variable_window_oracle_cost_lambda > 0`) or a budgeted assignment that only permits fine when deviation improvement clears a threshold.
+
+### Status: [COMPLETE]
+
 ## EXP-089: Action-Value Variable Window Router
 
 **Date:** 2026-06-19

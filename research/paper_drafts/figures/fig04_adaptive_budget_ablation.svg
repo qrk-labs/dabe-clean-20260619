@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="620" viewBox="0 0 920 620">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<style>
+  .title { font-family: Georgia, serif; font-size: 22px; font-weight: 700; fill: #1e2724; }
+  .subtitle { font-family: Georgia, serif; font-size: 13px; fill: #65736f; }
+  .axis { stroke: #1e2724; stroke-width: 1.2; }
+  .grid { stroke: #d8ddd7; stroke-width: 1; }
+  .tick { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #65736f; }
+  .label { font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #1e2724; }
+  .small { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #65736f; }
+</style>
+<text x="90" y="38" class="title">Fig. 4. Adaptive repair-budget ablation</text>
+<text x="90" y="60" class="subtitle">Better allocation recovers high-K quality without paying the full fixed-K cost.</text>
+<line x1="90.0" y1="82" x2="90.0" y2="528" class="grid"/>
+<text x="90.0" y="552" text-anchor="middle" class="tick">16.6</text>
+<line x1="235.0" y1="82" x2="235.0" y2="528" class="grid"/>
+<text x="235.0" y="552" text-anchor="middle" class="tick">19.4</text>
+<line x1="380.0" y1="82" x2="380.0" y2="528" class="grid"/>
+<text x="380.0" y="552" text-anchor="middle" class="tick">22.2</text>
+<line x1="525.0" y1="82" x2="525.0" y2="528" class="grid"/>
+<text x="525.0" y="552" text-anchor="middle" class="tick">25.0</text>
+<line x1="670.0" y1="82" x2="670.0" y2="528" class="grid"/>
+<text x="670.0" y="552" text-anchor="middle" class="tick">27.8</text>
+<line x1="90" y1="528.0" x2="670" y2="528.0" class="grid"/>
+<text x="78" y="532.0" text-anchor="end" class="tick">0.75</text>
+<line x1="90" y1="416.5" x2="670" y2="416.5" class="grid"/>
+<text x="78" y="420.5" text-anchor="end" class="tick">0.80</text>
+<line x1="90" y1="305.0" x2="670" y2="305.0" class="grid"/>
+<text x="78" y="309.0" text-anchor="end" class="tick">0.84</text>
+<line x1="90" y1="193.5" x2="670" y2="193.5" class="grid"/>
+<text x="78" y="197.5" text-anchor="end" class="tick">0.89</text>
+<line x1="90" y1="82.0" x2="670" y2="82.0" class="grid"/>
+<text x="78" y="86.0" text-anchor="end" class="tick">0.93</text>
+<line x1="90" y1="528" x2="670" y2="528" class="axis"/>
+<line x1="90" y1="82" x2="90" y2="528" class="axis"/>
+<text x="380.0" y="590" text-anchor="middle" class="label">observed/effective bits per token</text>
+<text x="26" y="305.0" transform="rotate(-90 26 305.0)" text-anchor="middle" class="label">token accuracy</text>
+<circle cx="708" cy="92" r="6" fill="#1f6f68"/>
+<text x="722" y="96" class="small">dabe</text>
+<circle cx="708" cy="114" r="6" fill="#d08a21"/>
+<text x="722" y="118" class="small">adaptive</text>
+<circle cx="708" cy="136" r="6" fill="#3f6fb5"/>
+<text x="722" y="140" class="small">fixed lookup</text>
+<circle cx="130.0" cy="497.2" r="7" fill="#3f6fb5" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="139.0" y="487.2" text-anchor="start" class="small">080-K4</text>
+<circle cx="201.4" cy="444.1" r="7" fill="#3f6fb5" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="210.4" y="434.1" text-anchor="start" class="small">077</text>
+<circle cx="344.3" cy="287.8" r="7" fill="#3f6fb5" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="353.3" y="277.8" text-anchor="start" class="small">080-K16</text>
+<circle cx="630.0" cy="112.8" r="7" fill="#3f6fb5" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="639.0" y="102.8" text-anchor="start" class="small">083</text>
+<circle cx="362.2" cy="133.8" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="370.2" y="107.8" text-anchor="start" class="small">084</text>
+<circle cx="345.7" cy="135.4" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="333.7" y="150.4" text-anchor="end" class="small">085-K12</text>
+<circle cx="362.2" cy="133.8" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="372.2" y="153.8" text-anchor="start" class="small">085-K16</text>
+<circle cx="386.9" cy="130.5" r="7" fill="#d08a21" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="398.9" y="122.5" text-anchor="start" class="small">085-K20</text>
+<circle cx="268.4" cy="129.6" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="258.4" y="113.6" text-anchor="end" class="small">086</text>
+<circle cx="285.7" cy="121.0" r="7" fill="#1f6f68" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>
+<text x="297.7" y="135.0" text-anchor="start" class="small">087</text>
+</svg>

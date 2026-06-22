@@ -53,6 +53,8 @@ dabe_tokenizer:
     variable_window_refine_layers: 1
     variable_window_target_mode: "quantile"
     variable_window_oracle_cost_lambda: 0.0
+    variable_window_mixing_mode: "soft"
+    variable_window_temperature: 1.0
     sliding_global_bits: 96
     sliding_medium_window: 32
     sliding_medium_stride: 16

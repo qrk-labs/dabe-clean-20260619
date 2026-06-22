@@ -1,0 +1,41 @@
+{
+  "title": "Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair",
+  "upload_type": "publication",
+  "publication_type": "preprint",
+  "publication_date": "2026-06-22",
+  "creators": [
+    {
+      "name": "Tsowa, Mainasara Al-amin",
+      "affiliation": "Qrk Labs",
+      "email": "mainasara@qrk.ng"
+    },
+    {
+      "name": "Tsowa, Babangida Usman",
+      "affiliation": "Qrk Labs",
+      "email": "babangida@qrk.ng"
+    }
+  ],
+  "description": "Modern subword tokenizers allocate lexical capacity through a fixed segmentation policy rather than through local span difficulty. This paper studies Density-Adaptive Bitmask Encoding (DABE), a learned tokenizer-autoencoder that compresses fixed 64-token GPT-2-token chunks into binary codes and spends sparse lexical repair capacity only where reconstruction is difficult. Across controlled TinyStories experiments, fixed chunks plus adaptive sparse lexical repair outperform matched fixed-rate learned compression and variable-window alternatives at approximately 20 bits/token.",
+  "access_right": "open",
+  "license": "cc-by-4.0",
+  "version": "paper-v1",
+  "language": "eng",
+  "keywords": [
+    "learned tokenization",
+    "rate-distortion",
+    "sparse lexical repair",
+    "tokenizer autoencoder",
+    "DABE",
+    "BPE",
+    "TinyStories",
+    "adaptive computation"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/qrk-labs/dabe-clean-20260619",
+      "relation": "isSupplementedBy",
+      "resource_type": "software"
+    }
+  ],
+  "notes": "DOI placeholder: 10.5281/zenodo.TODO. Reserve a DOI in the Zenodo draft, replace the placeholder in metadata and manuscript if desired, then publish."
+}

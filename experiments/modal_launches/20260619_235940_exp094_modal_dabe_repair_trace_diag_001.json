@@ -1,0 +1,12 @@
+{
+  "launched_at": "2026-06-19T23:09:51.513598+00:00",
+  "run_id": "exp094_modal_dabe_repair_trace_diag_001",
+  "app_id": "ap-4oa8OgANjvDRfj5ap9I7NL",
+  "status": "completed",
+  "function": "scripts/modal_dabe_tokenizer_autoencoder.py::run_tokenizer_decode_diagnostics",
+  "source_run_id": "exp087_modal_dabe_gist_residual_router_sweep_001/exp087_router_w0p2_cost0p02",
+  "checkpoint_name": "best-step-0012000.ckpt",
+  "max_batches": 43,
+  "num_samples": 64,
+  "notes": "Relaunch after strict=False diagnostic checkpoint loading patch."
+}
