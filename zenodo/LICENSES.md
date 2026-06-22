@@ -1,0 +1,16 @@
+# Licensing Notes
+
+This deposit separates paper reuse rights from software reuse rights.
+
+- Paper PDF, Typst source, markdown drafts, tables, and figures:
+  Creative Commons Attribution 4.0 International (`CC-BY-4.0`).
+- Repository source code, scripts, configs, and tests:
+  MIT License, as provided in the repository `LICENSE` file.
+- Lightweight experiment outputs:
+  Included for reproducibility and citation of the paper. Reuse should preserve
+  attribution to the DABE paper and repository.
+
+If Zenodo requires a single record-level license, prefer separate records:
+
+1. Paper/preprint record under `CC-BY-4.0`.
+2. Software/artifact record under `MIT`, with this licensing note included.

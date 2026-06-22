@@ -1,0 +1,34 @@
+{
+  "title": "DABE Paper Artifact: Fixed Chunks with Sparse Lexical Repair",
+  "upload_type": "software",
+  "publication_date": "2026-06-22",
+  "creators": [
+    {
+      "name": "Tsowa, Mainasara Al-amin",
+      "affiliation": "Qrk Labs"
+    },
+    {
+      "name": "Tsowa, Babangida Usman",
+      "affiliation": "Qrk Labs"
+    }
+  ],
+  "description": "Software and lightweight reproducibility artifacts for the paper Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair. The artifact includes source code, selected configs, figure generation data, experiment logs, launch contracts, and Modal JSON/CSV summaries supporting the paper's fixed-chunk sparse-repair tokenizer-autoencoder results.",
+  "access_right": "open",
+  "license": "mit-license",
+  "version": "paper-v1",
+  "keywords": [
+    "learned tokenization",
+    "rate-distortion",
+    "sparse lexical repair",
+    "tokenizer autoencoder",
+    "DABE",
+    "reproducibility artifact"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.TODO",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-preprint"
+    }
+  ]
+}

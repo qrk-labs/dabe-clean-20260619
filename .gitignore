@@ -43,6 +43,11 @@ experiments/**/wandb/
 research/.tools/
 tmp/
 
+# Generated Zenodo upload bundles. Keep metadata/scripts in Git, rebuild these
+# locally when reserving the final DOI or preparing an upload.
+zenodo/deposit/
+zenodo/*.zip
+
 # EXP-094 duplicates full diagnostics in these wrapper payloads; keep decode_diagnostics.json instead.
 experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/pipeline_summary.json
 experiments/modal_downloads/exp094_modal_dabe_repair_trace_diag_001/stage_result.json

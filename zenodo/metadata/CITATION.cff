@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this paper or artifact, please cite it as below."
+title: "Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair"
+version: "paper-v1"
+doi: "10.5281/zenodo.TODO"
+date-released: "2026-06-22"
+repository-code: "https://github.com/qrk-labs/dabe-clean-20260619"
+license: "MIT"
+authors:
+  - family-names: "Tsowa"
+    given-names: "Mainasara Al-amin"
+    email: "mainasara@qrk.ng"
+  - family-names: "Tsowa"
+    given-names: "Babangida Usman"
+    email: "babangida@qrk.ng"
+keywords:
+  - "learned tokenization"
+  - "rate-distortion"
+  - "sparse lexical repair"
+  - "tokenizer autoencoder"
+  - "DABE"
+preferred-citation:
+  type: article
+  title: "Density-Adaptive Bitmask Encoding: Fixed Chunks with Sparse Lexical Repair"
+  doi: "10.5281/zenodo.TODO"
+  year: 2026
+  authors:
+    - family-names: "Tsowa"
+      given-names: "Mainasara Al-amin"
+      email: "mainasara@qrk.ng"
+    - family-names: "Tsowa"
+      given-names: "Babangida Usman"
+      email: "babangida@qrk.ng"
