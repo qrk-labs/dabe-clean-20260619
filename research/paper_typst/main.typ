@@ -1,3 +1,7 @@
+// DEVELOPMENT FREEZE: DABE is frozen as the publication artifact for
+// https://doi.org/10.5281/zenodo.20797432. Do not alter scientific claims,
+// experiments, or paper content unless the user explicitly unfreezes development.
+
 #set page(margin: 1in)
 #set text(size: 10.5pt)
 #set heading(numbering: "1.")

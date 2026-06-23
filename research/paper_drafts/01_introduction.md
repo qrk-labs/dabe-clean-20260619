@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](../../FREEZE_NOTICE.md).
+
 # Introduction
 
 Subword tokenizers define the discrete interface between text and modern language models. Before a model sees language, text is committed to a sequence of symbols chosen by a tokenizer, usually a subword segmentation scheme such as byte-pair encoding or a related unigram model. These methods are efficient, robust, and easy to deploy, but their rate allocation is primarily corpus-level: frequent fragments receive compact symbols, rare lexical details are decomposed into longer sequences, and local span difficulty is not represented as an explicit allocation decision.

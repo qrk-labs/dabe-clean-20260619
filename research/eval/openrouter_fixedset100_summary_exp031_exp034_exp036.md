@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](../../FREEZE_NOTICE.md).
+
 # OpenRouter Fixed-Set(100) Summary: EXP-031 vs EXP-034 vs EXP-036
 
 | Run | Coherent | Strict | Unique | Dominant | Mojibake | Heuristic Rubric | LLM Rubric | LLM Pass | Latency (ms) |

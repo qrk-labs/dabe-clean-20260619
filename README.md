@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](FREEZE_NOTICE.md).
+
 # DABE: Density-Adaptive Variable-Width Bitmask Encoding
 
 A novel NLP architecture that replaces categorical token IDs with learned binary codes whose bit-width varies by information density.

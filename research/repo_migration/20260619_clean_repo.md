@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](../../FREEZE_NOTICE.md).
+
 # Clean Repository Migration - 2026-06-19
 
 This workspace was converted from the historical DABE Git repository into a fresh Git repository to remove large accumulated Git/LFS object storage.

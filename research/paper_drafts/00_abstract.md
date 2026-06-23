@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](../../FREEZE_NOTICE.md).
+
 # Working Abstract
 
 Modern subword tokenizers are efficient and robust, but they allocate lexical capacity through a fixed segmentation policy rather than through the local information demand of a span. We study Density-Adaptive Bitmask Encoding (DABE), a learned tokenizer-autoencoder that compresses fixed 64-token chunks into binary codes and spends additional sparse lexical repair capacity only where reconstruction is difficult.

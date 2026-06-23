@@ -1,3 +1,5 @@
+> **Development freeze:** DABE is frozen as the publication artifact for the preprint at https://doi.org/10.5281/zenodo.20797432. Do not run new experiments or alter scientific claims unless the user explicitly unfreezes development. See [`FREEZE_NOTICE.md`](../../FREEZE_NOTICE.md).
+
 # DABE Paper Typst Draft
 
 This directory contains a native Typst manuscript for the current DABE paper draft. It mirrors the TeX draft while using Typst syntax for headings, figures, tables, equations, citations, and bibliography.
